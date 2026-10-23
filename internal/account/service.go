@@ -15,6 +15,8 @@ import (
 	"github.com/mailquay/mailquay/internal/crypto"
 	"github.com/mailquay/mailquay/internal/imapclient"
 	"github.com/mailquay/mailquay/internal/mailbox"
+	"github.com/mailquay/mailquay/internal/mailsession"
+	"github.com/mailquay/mailquay/internal/netpace"
 	"github.com/mailquay/mailquay/internal/platform"
 	"github.com/mailquay/mailquay/internal/pop3client"
 	"github.com/mailquay/mailquay/internal/settings"
@@ -83,6 +85,8 @@ type Service struct {
 	cipher    *crypto.Cipher
 	logger    *slog.Logger
 	settings  *settings.Service
+	pacer     *netpace.Pacer
+	sessions  *mailsession.Pool
 	imports   *importStore
 	OnCreated func(ctx context.Context, accountID uuid.UUID)
 	OnDeleted func(ctx context.Context, accountID uuid.UUID)
@@ -97,6 +101,12 @@ func NewService(st *store.Store, cipher *crypto.Cipher, logger *slog.Logger) *Se
 
 // SetSettings wires runtime OAuth configuration.
 func (s *Service) SetSettings(settingsSvc *settings.Service) { s.settings = settingsSvc }
+
+// SetPacer wires server-wide connection admission and pacing.
+func (s *Service) SetPacer(pacer *netpace.Pacer) { s.pacer = pacer }
+
+// SetSessions wires the bounded per-account IMAP connection pool.
+func (s *Service) SetSessions(sessions *mailsession.Pool) { s.sessions = sessions }
 
 // List returns active accounts.
 func (s *Service) List(ctx context.Context) ([]sqlcgen.Account, error) {
@@ -351,36 +361,59 @@ func (s *Service) Test(ctx context.Context, id uuid.UUID) (TestResult, error) {
 	timeout := 15 * time.Second
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	limit := 8
+	if s.settings != nil {
+		limit = s.settings.Current().MaxIMAPConnectionsPerServer
+	}
 	if acct.ReceiveProtocol == "imap" && acct.ImapAddr != nil {
-		c, err := imapclient.Dial(ctx, imapclient.Config{
+		cfg := imapclient.Config{
 			Address: *acct.ImapAddr, Security: acct.ImapSecurity, Username: acct.Username,
 			Password: creds.Password, AccessToken: creds.AccessToken, Timeout: timeout,
+		}
+		dial := func(dialCtx context.Context, _ bool) (*imapclient.Client, error) {
+			release, err := s.pacer.AcquireConnection(dialCtx, cfg.Address, limit)
+			if err != nil {
+				return nil, err
+			}
+			client, err := imapclient.Dial(dialCtx, cfg)
+			if err != nil {
+				release()
+				return nil, err
+			}
+			client.SetCloseHook(release)
+			return client, nil
+		}
+		err := s.sessions.Do(ctx, acct.ID, true, dial, func(ctx context.Context, client *imapclient.Client) error {
+			_, err := client.List(ctx)
+			return err
 		})
 		if err != nil {
 			result.Errors = append(result.Errors, "IMAP: "+err.Error())
 		} else {
-			if _, err := c.List(ctx); err != nil {
-				result.Errors = append(result.Errors, "IMAP: "+err.Error())
-			} else {
-				result.ReceiveOK = true
-			}
-			_ = c.Close()
+			result.ReceiveOK = true
 		}
 	} else if acct.Pop3Addr != nil {
-		c, err := pop3client.Dial(ctx, pop3client.Config{
-			Address: *acct.Pop3Addr, Security: acct.Pop3Security, Username: acct.Username,
-			Password: creds.Password, Timeout: timeout,
-		})
+		release, err := s.pacer.AcquireConnection(ctx, *acct.Pop3Addr, limit)
 		if err != nil {
 			result.Errors = append(result.Errors, "POP3: "+err.Error())
 		} else {
-			if _, _, err := c.Stat(ctx); err != nil {
+			c, err := pop3client.Dial(ctx, pop3client.Config{
+				Address: *acct.Pop3Addr, Security: acct.Pop3Security, Username: acct.Username,
+				Password: creds.Password, Timeout: timeout,
+			})
+			if err != nil {
+				release()
 				result.Errors = append(result.Errors, "POP3: "+err.Error())
 			} else {
-				result.ReceiveOK = true
+				if _, _, err := c.Stat(ctx); err != nil {
+					result.Errors = append(result.Errors, "POP3: "+err.Error())
+				} else {
+					result.ReceiveOK = true
+				}
+				_ = c.Quit(ctx)
+				_ = c.Close()
+				release()
 			}
-			_ = c.Quit(ctx)
-			_ = c.Close()
 		}
 	}
 	if acct.SmtpAddr != nil && *acct.SmtpAddr != "" {

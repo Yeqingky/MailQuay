@@ -1,10 +1,8 @@
-// Package mailsession keeps one reusable IMAP connection per account.
+// Package mailsession keeps bounded, reusable IMAP connections per account.
 //
-// IMAP is a stateful protocol: a connection selects one mailbox at a time and
-// commands must not interleave. MailQuay therefore serializes all work for an
-// account on a single connection instead of dialing per message. Interactive
-// requests keep a short acquisition budget and fall back to a transient
-// connection so opening a message never waits behind a long sync.
+// IMAP is stateful: a connection selects one mailbox at a time and commands
+// must not interleave. MailQuay serializes account work on the reusable worker
+// connection and optionally maintains a dedicated IDLE listener.
 package mailsession
 
 import (
@@ -18,17 +16,15 @@ import (
 	"github.com/mailquay/mailquay/internal/imapclient"
 )
 
-// DialFunc opens a connection. interactive is true for transient connections
-// that bypass background pacing.
+// DialFunc opens a paced connection. interactive is reserved for callers that
+// need to express urgency to the dialer.
 type DialFunc func(ctx context.Context, interactive bool) (*imapclient.Client, error)
 
-// interactiveWait bounds how long an interactive request waits for the shared
-// connection before using a transient one.
-const interactiveWait = 250 * time.Millisecond
-
-// Pool owns one session per account.
+// Pool owns one reusable IMAP worker connection per account and the optional
+// dedicated IDLE connection.
 type Pool struct {
-	idleTimeout time.Duration
+	idleTimeout    time.Duration
+	maxConnections int
 
 	mu        sync.Mutex
 	sessions  map[uuid.UUID]*Session
@@ -37,17 +33,18 @@ type Pool struct {
 	closeOnce sync.Once
 }
 
-// NewPool returns a pool whose idle connections are closed after idleTimeout.
-// A nil Pool runs every call on a transient connection.
+// NewPool returns a pool with two connections per account and a ten-minute
+// worker-connection idle timeout.
 func NewPool(idleTimeout time.Duration) *Pool {
 	if idleTimeout <= 0 {
-		idleTimeout = 3 * time.Minute
+		idleTimeout = 10 * time.Minute
 	}
 	p := &Pool{
-		idleTimeout: idleTimeout,
-		sessions:    make(map[uuid.UUID]*Session),
-		stop:        make(chan struct{}),
-		done:        make(chan struct{}),
+		idleTimeout:    idleTimeout,
+		maxConnections: 2,
+		sessions:       make(map[uuid.UUID]*Session),
+		stop:           make(chan struct{}),
+		done:           make(chan struct{}),
 	}
 	go p.reaper()
 	return p
@@ -56,26 +53,22 @@ func NewPool(idleTimeout time.Duration) *Pool {
 // ErrBusy reports that a session stayed busy for the whole wait budget.
 var ErrBusy = errors.New("mailsession: account connection busy")
 
-// Do runs fn on the account's connection. Background calls queue in order;
-// interactive calls jump the queue and fall back to a transient connection
-// when the shared one stays busy.
+// Do runs fn on the account's reusable worker connection. Interactive calls
+// jump the queue; a connection is never opened beyond the configured account
+// limit.
 func (p *Pool) Do(ctx context.Context, accountID uuid.UUID, interactive bool, dial DialFunc, fn func(context.Context, *imapclient.Client) error) error {
 	if p == nil {
 		return transient(ctx, dial, interactive, fn)
 	}
 	s := p.session(accountID)
-	wait := time.Duration(0)
-	if interactive {
-		wait = interactiveWait
+	if p.MaxConnections() == 1 {
+		s.stopSharedIdle()
 	}
-	acquired, err := s.gate.acquire(ctx, interactive, wait)
+	acquired, err := s.gate.acquire(ctx, interactive, 0)
 	if err != nil {
 		return err
 	}
 	if !acquired {
-		if interactive {
-			return transient(ctx, dial, true, fn)
-		}
 		return ErrBusy
 	}
 	return s.run(ctx, dial, fn)
@@ -88,6 +81,9 @@ func (p *Pool) TryDo(ctx context.Context, accountID uuid.UUID, wait time.Duratio
 		return transient(ctx, dial, false, fn)
 	}
 	s := p.session(accountID)
+	if p.MaxConnections() == 1 {
+		s.stopSharedIdle()
+	}
 	acquired, err := s.gate.acquire(ctx, false, wait)
 	if err != nil {
 		return err
@@ -165,9 +161,10 @@ func (p *Pool) reaper() {
 	}
 }
 
-// reap closes connections that have been idle longer than idleTimeout.
+// reap closes worker connections that have been idle longer than idleTimeout.
 func (p *Pool) reap(now time.Time) {
 	p.mu.Lock()
+	idleTimeout := p.idleTimeout
 	sessions := make([]*Session, 0, len(p.sessions))
 	for _, s := range p.sessions {
 		sessions = append(sessions, s)
@@ -178,7 +175,7 @@ func (p *Pool) reap(now time.Time) {
 			continue
 		}
 		s.mu.Lock()
-		if s.client != nil && now.Sub(s.lastUsed) >= p.idleTimeout {
+		if s.client != nil && now.Sub(s.lastUsed) >= idleTimeout {
 			_ = s.client.Close()
 			s.client = nil
 		}
@@ -187,13 +184,16 @@ func (p *Pool) reap(now time.Time) {
 	}
 }
 
-// Session is the per-account connection and its command gate.
+// Session is the per-account reusable connection and its command gates.
 type Session struct {
-	gate gate
+	gate     gate
+	idleGate gate
 
-	mu       sync.Mutex
-	client   *imapclient.Client
-	lastUsed time.Time
+	mu         sync.Mutex
+	client     *imapclient.Client
+	idleClient *imapclient.Client
+	idleStop   chan struct{}
+	lastUsed   time.Time
 }
 
 func (s *Session) run(ctx context.Context, dial DialFunc, fn func(context.Context, *imapclient.Client) error) error {
@@ -211,7 +211,9 @@ func (s *Session) conn(ctx context.Context, dial DialFunc) (*imapclient.Client, 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.client != nil && !s.client.Closed() {
-		return s.client, nil
+		if err := s.client.Ping(ctx); err == nil {
+			return s.client, nil
+		}
 	}
 	if s.client != nil {
 		_ = s.client.Close()
@@ -243,9 +245,14 @@ func (s *Session) finish(cause error) {
 func (s *Session) close() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.stopSharedIdleLocked()
 	if s.client != nil {
 		_ = s.client.Close()
 		s.client = nil
+	}
+	if s.idleClient != nil {
+		_ = s.idleClient.Close()
+		s.idleClient = nil
 	}
 }
 

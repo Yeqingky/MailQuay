@@ -101,24 +101,28 @@ func NewService(st *store.Store, accounts *account.Service,
 	}
 }
 
-// dialIMAP paces connection attempts per remote host before dialing.
+// dialIMAP reserves a server-wide connection slot and paces attempts before dialing.
 func (s *Service) dialIMAP(ctx context.Context, cfg imapclient.Config) (*imapclient.Client, error) {
-	if err := s.pacer.Wait(ctx, cfg.Address); err != nil {
+	release, err := s.pacer.AcquireConnection(ctx, cfg.Address, s.settings.Current().MaxIMAPConnectionsPerServer)
+	if err != nil {
 		return nil, err
 	}
-	return imapclient.Dial(ctx, cfg)
+	client, err := imapclient.Dial(ctx, cfg)
+	if err != nil {
+		release()
+		return nil, err
+	}
+	client.SetCloseHook(release)
+	return client, nil
 }
 
-// imapDialer returns the background dialer for an account session.
+// imapDialer returns the account session's quota-managed connection dialer.
 func (s *Service) imapDialer(acct sqlcgen.Account, creds account.Credentials) mailsession.DialFunc {
 	cfg := imapclient.Config{
 		Address: deref(acct.ImapAddr), Security: acct.ImapSecurity, Username: acct.Username,
 		Password: creds.Password, AccessToken: creds.AccessToken, Timeout: 30 * time.Second,
 	}
-	return func(ctx context.Context, interactive bool) (*imapclient.Client, error) {
-		if interactive {
-			return imapclient.Dial(ctx, cfg)
-		}
+	return func(ctx context.Context, _ bool) (*imapclient.Client, error) {
 		return s.dialIMAP(ctx, cfg)
 	}
 }

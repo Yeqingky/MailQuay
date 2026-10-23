@@ -21,37 +21,46 @@ import (
 // Values holds every runtime-editable preference. Secrets are kept separately
 // and never serialized.
 type Values struct {
-	DefaultInitialSyncRange  string `json:"defaultInitialSyncRange"`
-	DefaultDownloadScope     string `json:"defaultDownloadScope"`
-	PreserveMarked           bool   `json:"preserveMarkedOnAccountDelete"`
-	SentSyncMode             string `json:"sentSyncMode"`
-	DraftSyncMode            string `json:"draftSyncMode"`
-	DraftPullIntervalSeconds int    `json:"draftPullIntervalSeconds"`
-	DraftPushDelaySeconds    int    `json:"draftPushDelaySeconds"`
-	ComposeWindowMode        string `json:"composeWindowMode"`
-	SendRetryLimit           int    `json:"sendRetryLimit"`
-	NetworkAvatars           bool   `json:"networkAvatars"`
-	GravatarAvatars          bool   `json:"gravatarAvatars"`
-	BimiAvatars              bool   `json:"bimiAvatars"`
-	GoogleFaviconAvatars     bool   `json:"googleFaviconAvatars"`
-	Timezone                 string `json:"timezone"`
-	Language                 string `json:"language"`
-	RemoveReadImmediately    bool   `json:"removeReadImmediately"`
-	PrependNewMessages       bool   `json:"prependNewMessages"`
-	SyncConcurrency          int    `json:"syncConcurrency"`
-	FetchConcurrency         int    `json:"fetchConcurrency"`
-	SearchConcurrency        int    `json:"searchConcurrency"`
-	IndexBatchSize           int    `json:"indexBatchSize"`
-	AutoLocalConcurrency     bool   `json:"autoLocalConcurrency"`
-	EnvelopeBatchSize        int    `json:"envelopeBatchSize"`
-	SessionTTLHours          int    `json:"sessionTtlHours"`
-	SyncIntervalSeconds      int    `json:"syncIntervalSeconds"`
-	POP3IntervalSeconds      int    `json:"pop3IntervalSeconds"`
-	BodyPrefetchMaxBytes     int64  `json:"bodyPrefetchMaxBytes"`
-	MaxAttachmentBytes       int64  `json:"maxAttachmentBytes"`
-	GoogleClientID           string `json:"googleClientId"`
-	MicrosoftClientID        string `json:"microsoftClientId"`
-	LogLevel                 string `json:"logLevel"`
+	DefaultInitialSyncRange         string `json:"defaultInitialSyncRange"`
+	DefaultDownloadScope            string `json:"defaultDownloadScope"`
+	PreserveMarked                  bool   `json:"preserveMarkedOnAccountDelete"`
+	SentSyncMode                    string `json:"sentSyncMode"`
+	DraftSyncMode                   string `json:"draftSyncMode"`
+	DraftPullIntervalSeconds        int    `json:"draftPullIntervalSeconds"`
+	DraftPushDelaySeconds           int    `json:"draftPushDelaySeconds"`
+	ComposeWindowMode               string `json:"composeWindowMode"`
+	SendRetryLimit                  int    `json:"sendRetryLimit"`
+	NetworkAvatars                  bool   `json:"networkAvatars"`
+	GravatarAvatars                 bool   `json:"gravatarAvatars"`
+	BimiAvatars                     bool   `json:"bimiAvatars"`
+	GoogleFaviconAvatars            bool   `json:"googleFaviconAvatars"`
+	Timezone                        string `json:"timezone"`
+	Language                        string `json:"language"`
+	RemoveReadImmediately           bool   `json:"removeReadImmediately"`
+	PrependNewMessages              bool   `json:"prependNewMessages"`
+	SyncConcurrency                 int    `json:"syncConcurrency"`
+	FetchConcurrency                int    `json:"fetchConcurrency"`
+	SearchConcurrency               int    `json:"searchConcurrency"`
+	IndexBatchSize                  int    `json:"indexBatchSize"`
+	AutoLocalConcurrency            bool   `json:"autoLocalConcurrency"`
+	EnvelopeBatchSize               int    `json:"envelopeBatchSize"`
+	SessionTTLHours                 int    `json:"sessionTtlHours"`
+	SyncIntervalSeconds             int    `json:"syncIntervalSeconds"`
+	OtherMailboxSyncIntervalSeconds int    `json:"otherMailboxSyncIntervalSeconds"`
+	POP3IntervalSeconds             int    `json:"pop3IntervalSeconds"`
+	AutoSync                        bool   `json:"autoSync"`
+	RealTimeReceive                 bool   `json:"realTimeReceive"`
+	StartupSync                     bool   `json:"startupSync"`
+	MaxIMAPConnectionsPerAccount    int    `json:"maxImapConnectionsPerAccount"`
+	IMAPWorkIdleTimeoutSeconds      int    `json:"imapWorkIdleTimeoutSeconds"`
+	MaxIMAPConnectionsPerServer     int    `json:"maxImapConnectionsPerServer"`
+	MaxConcurrentSyncsPerServer     int    `json:"maxConcurrentSyncsPerServer"`
+	AutoReconnect                   bool   `json:"autoReconnect"`
+	BodyPrefetchMaxBytes            int64  `json:"bodyPrefetchMaxBytes"`
+	MaxAttachmentBytes              int64  `json:"maxAttachmentBytes"`
+	GoogleClientID                  string `json:"googleClientId"`
+	MicrosoftClientID               string `json:"microsoftClientId"`
+	LogLevel                        string `json:"logLevel"`
 }
 
 // Concurrency is the effective worker configuration. Network pools come from
@@ -94,35 +103,44 @@ type Bootstrap struct {
 // Defaults returns the documented defaults.
 func Defaults() Values {
 	return Values{
-		DefaultInitialSyncRange:  "all",
-		DefaultDownloadScope:     "full_no_attachments",
-		PreserveMarked:           true,
-		SentSyncMode:             "pull",
-		DraftSyncMode:            "pull",
-		DraftPullIntervalSeconds: 60,
-		DraftPushDelaySeconds:    30,
-		ComposeWindowMode:        "in_app",
-		SendRetryLimit:           3,
-		NetworkAvatars:           true,
-		GravatarAvatars:          true,
-		BimiAvatars:              true,
-		GoogleFaviconAvatars:     true,
-		Timezone:                 "UTC",
-		Language:                 "en",
-		RemoveReadImmediately:    false,
-		PrependNewMessages:       true,
-		SyncConcurrency:          2,
-		FetchConcurrency:         2,
-		SearchConcurrency:        1,
-		IndexBatchSize:           50,
-		AutoLocalConcurrency:     true,
-		EnvelopeBatchSize:        50,
-		SessionTTLHours:          168,
-		SyncIntervalSeconds:      300,
-		POP3IntervalSeconds:      300,
-		BodyPrefetchMaxBytes:     2 << 20,
-		MaxAttachmentBytes:       25 << 20,
-		LogLevel:                 "info",
+		DefaultInitialSyncRange:         "all",
+		DefaultDownloadScope:            "full_no_attachments",
+		PreserveMarked:                  true,
+		SentSyncMode:                    "pull",
+		DraftSyncMode:                   "pull",
+		DraftPullIntervalSeconds:        60,
+		DraftPushDelaySeconds:           30,
+		ComposeWindowMode:               "in_app",
+		SendRetryLimit:                  3,
+		NetworkAvatars:                  true,
+		GravatarAvatars:                 true,
+		BimiAvatars:                     true,
+		GoogleFaviconAvatars:            true,
+		Timezone:                        "UTC",
+		Language:                        "en",
+		RemoveReadImmediately:           false,
+		PrependNewMessages:              true,
+		SyncConcurrency:                 2,
+		FetchConcurrency:                2,
+		SearchConcurrency:               1,
+		IndexBatchSize:                  50,
+		AutoLocalConcurrency:            true,
+		EnvelopeBatchSize:               50,
+		SessionTTLHours:                 168,
+		SyncIntervalSeconds:             600,
+		OtherMailboxSyncIntervalSeconds: 900,
+		POP3IntervalSeconds:             300,
+		AutoSync:                        true,
+		RealTimeReceive:                 true,
+		StartupSync:                     true,
+		MaxIMAPConnectionsPerAccount:    2,
+		IMAPWorkIdleTimeoutSeconds:      600,
+		MaxIMAPConnectionsPerServer:     8,
+		MaxConcurrentSyncsPerServer:     2,
+		AutoReconnect:                   true,
+		BodyPrefetchMaxBytes:            2 << 20,
+		MaxAttachmentBytes:              25 << 20,
+		LogLevel:                        "info",
 	}
 }
 
@@ -475,6 +493,24 @@ func decodeInto(key string, raw json.RawMessage, v *Values) error {
 		return json.Unmarshal(raw, &v.SyncIntervalSeconds)
 	case "pop3_interval_seconds":
 		return json.Unmarshal(raw, &v.POP3IntervalSeconds)
+	case "other_mailbox_sync_interval_seconds":
+		return json.Unmarshal(raw, &v.OtherMailboxSyncIntervalSeconds)
+	case "auto_sync":
+		return json.Unmarshal(raw, &v.AutoSync)
+	case "real_time_receive":
+		return json.Unmarshal(raw, &v.RealTimeReceive)
+	case "startup_sync":
+		return json.Unmarshal(raw, &v.StartupSync)
+	case "max_imap_connections_per_account":
+		return json.Unmarshal(raw, &v.MaxIMAPConnectionsPerAccount)
+	case "imap_work_idle_timeout_seconds":
+		return json.Unmarshal(raw, &v.IMAPWorkIdleTimeoutSeconds)
+	case "max_imap_connections_per_server":
+		return json.Unmarshal(raw, &v.MaxIMAPConnectionsPerServer)
+	case "max_concurrent_syncs_per_server":
+		return json.Unmarshal(raw, &v.MaxConcurrentSyncsPerServer)
+	case "auto_reconnect":
+		return json.Unmarshal(raw, &v.AutoReconnect)
 	case "body_prefetch_max_bytes":
 		return json.Unmarshal(raw, &v.BodyPrefetchMaxBytes)
 	case "max_attachment_bytes":
@@ -543,6 +579,24 @@ func setField(key string, raw json.RawMessage, v *Values) error {
 		return json.Unmarshal(raw, &v.SyncIntervalSeconds)
 	case "pop3_interval_seconds":
 		return json.Unmarshal(raw, &v.POP3IntervalSeconds)
+	case "other_mailbox_sync_interval_seconds":
+		return json.Unmarshal(raw, &v.OtherMailboxSyncIntervalSeconds)
+	case "auto_sync":
+		return json.Unmarshal(raw, &v.AutoSync)
+	case "real_time_receive":
+		return json.Unmarshal(raw, &v.RealTimeReceive)
+	case "startup_sync":
+		return json.Unmarshal(raw, &v.StartupSync)
+	case "max_imap_connections_per_account":
+		return json.Unmarshal(raw, &v.MaxIMAPConnectionsPerAccount)
+	case "imap_work_idle_timeout_seconds":
+		return json.Unmarshal(raw, &v.IMAPWorkIdleTimeoutSeconds)
+	case "max_imap_connections_per_server":
+		return json.Unmarshal(raw, &v.MaxIMAPConnectionsPerServer)
+	case "max_concurrent_syncs_per_server":
+		return json.Unmarshal(raw, &v.MaxConcurrentSyncsPerServer)
+	case "auto_reconnect":
+		return json.Unmarshal(raw, &v.AutoReconnect)
 	case "body_prefetch_max_bytes":
 		return json.Unmarshal(raw, &v.BodyPrefetchMaxBytes)
 	case "max_attachment_bytes":
@@ -611,6 +665,24 @@ func fieldValue(key string, v Values) (any, error) {
 		return v.SyncIntervalSeconds, nil
 	case "pop3_interval_seconds":
 		return v.POP3IntervalSeconds, nil
+	case "other_mailbox_sync_interval_seconds":
+		return v.OtherMailboxSyncIntervalSeconds, nil
+	case "auto_sync":
+		return v.AutoSync, nil
+	case "real_time_receive":
+		return v.RealTimeReceive, nil
+	case "startup_sync":
+		return v.StartupSync, nil
+	case "max_imap_connections_per_account":
+		return v.MaxIMAPConnectionsPerAccount, nil
+	case "imap_work_idle_timeout_seconds":
+		return v.IMAPWorkIdleTimeoutSeconds, nil
+	case "max_imap_connections_per_server":
+		return v.MaxIMAPConnectionsPerServer, nil
+	case "max_concurrent_syncs_per_server":
+		return v.MaxConcurrentSyncsPerServer, nil
+	case "auto_reconnect":
+		return v.AutoReconnect, nil
 	case "body_prefetch_max_bytes":
 		return v.BodyPrefetchMaxBytes, nil
 	case "max_attachment_bytes":
@@ -678,6 +750,21 @@ func validate(v Values) error {
 	}
 	if v.POP3IntervalSeconds < 30 || v.POP3IntervalSeconds > 86400 {
 		return errors.New("pop3IntervalSeconds must be 30-86400")
+	}
+	if v.OtherMailboxSyncIntervalSeconds < 30 || v.OtherMailboxSyncIntervalSeconds > 86400 {
+		return errors.New("otherMailboxSyncIntervalSeconds must be 30-86400")
+	}
+	if v.MaxIMAPConnectionsPerAccount < 1 || v.MaxIMAPConnectionsPerAccount > 3 {
+		return errors.New("maxImapConnectionsPerAccount must be 1-3")
+	}
+	if v.IMAPWorkIdleTimeoutSeconds < 60 || v.IMAPWorkIdleTimeoutSeconds > 3600 {
+		return errors.New("imapWorkIdleTimeoutSeconds must be 60-3600")
+	}
+	if v.MaxIMAPConnectionsPerServer < 1 || v.MaxIMAPConnectionsPerServer > 64 {
+		return errors.New("maxImapConnectionsPerServer must be 1-64")
+	}
+	if v.MaxConcurrentSyncsPerServer < 1 || v.MaxConcurrentSyncsPerServer > 32 {
+		return errors.New("maxConcurrentSyncsPerServer must be 1-32")
 	}
 	if v.BodyPrefetchMaxBytes < 0 || v.BodyPrefetchMaxBytes > 1<<30 {
 		return errors.New("bodyPrefetchMaxBytes must be 0-1 GiB")

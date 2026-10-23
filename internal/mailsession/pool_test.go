@@ -131,7 +131,7 @@ func TestInteractiveJumpsQueue(t *testing.T) {
 	}
 }
 
-func TestInteractiveFallsBackWhenBusy(t *testing.T) {
+func TestInteractiveWaitsWithoutOpeningExtraConnection(t *testing.T) {
 	addr := startServer(t)
 	var dials atomic.Int32
 	p := NewPool(time.Minute)
@@ -151,17 +151,63 @@ func TestInteractiveFallsBackWhenBusy(t *testing.T) {
 	}()
 	<-started
 
-	start := time.Now()
-	if err := p.Do(context.Background(), id, true, dialer(t, addr, &dials), listMailboxes); err != nil {
-		t.Fatal(err)
+	interactiveDone := make(chan error, 1)
+	go func() {
+		interactiveDone <- p.Do(context.Background(), id, true, dialer(t, addr, &dials), listMailboxes)
+	}()
+	select {
+	case err := <-interactiveDone:
+		t.Fatalf("interactive call completed while worker was occupied: %v", err)
+	case <-time.After(40 * time.Millisecond):
 	}
-	if elapsed := time.Since(start); elapsed >= 800*time.Millisecond {
-		t.Fatalf("interactive call took %v; it waited for the busy session", elapsed)
+	if got := dials.Load(); got != 1 {
+		t.Fatalf("dials while worker was occupied = %d, want 1", got)
 	}
+
 	close(release)
 	<-blockerDone
-	if got := dials.Load(); got != 2 {
-		t.Fatalf("dials = %d, want 2 (session + transient)", got)
+	if err := <-interactiveDone; err != nil {
+		t.Fatal(err)
+	}
+	if got := dials.Load(); got != 1 {
+		t.Fatalf("dials = %d, want 1 reusable connection", got)
+	}
+}
+
+func TestSingleConnectionInterruptsIdleForWork(t *testing.T) {
+	addr := startServer(t)
+	var dials atomic.Int32
+	p := NewPool(time.Minute)
+	p.Configure(1, time.Minute)
+	defer p.Close()
+	id := uuid.New()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	idleDone := make(chan error, 1)
+	go func() {
+		_, interrupted, err := p.RunIdleRound(ctx, id, "INBOX", time.Minute, dialer(t, addr, &dials))
+		if err == nil && !interrupted {
+			err = errors.New("IDLE round returned without interruption")
+		}
+		idleDone <- err
+	}()
+	deadline := time.Now().Add(time.Second)
+	for dials.Load() == 0 && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if dials.Load() == 0 {
+		t.Fatal("IDLE connection was not opened")
+	}
+
+	if err := p.Do(ctx, id, true, dialer(t, addr, &dials), listMailboxes); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-idleDone; err != nil {
+		t.Fatal(err)
+	}
+	if got := dials.Load(); got != 1 {
+		t.Fatalf("dials = %d, want shared IDLE/work connection", got)
 	}
 }
 

@@ -19,6 +19,7 @@ tags:
   - name: outbox
   - name: search
   - name: tasks
+  - name: logs
   - name: settings
   - name: events
   - name: oauth
@@ -312,6 +313,23 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Mailbox' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      operationId: updateMailbox
+      tags: [mailboxes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MailboxUpdate' }
+      responses:
+        '200':
+          description: Updated mailbox.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Mailbox' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
   /mailboxes/{id}/sync:
@@ -953,6 +971,29 @@ paths:
         '204': { description: Failure hidden from the task ring. }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /logs:
+    get:
+      operationId: listLogs
+      tags: [logs]
+      responses:
+        '200':
+          description: Recent runtime log records, ordered from oldest to newest.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items: { $ref: '#/components/schemas/LogEntry' }
+                required: [logs]
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      operationId: clearLogs
+      tags: [logs]
+      responses:
+        '204': { description: Runtime log history cleared. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /settings:
     get:
       operationId: getSettings
@@ -1383,6 +1424,11 @@ components:
         lastSyncedAt: { type: string, format: date-time }
         lastError: { type: string }
       required: [id, accountId, path, name, role, localOnly, syncMode, total, unread, syncState]
+    MailboxUpdate:
+      type: object
+      properties:
+        syncMode: { type: string, enum: [full, pull, off] }
+      required: [syncMode]
     AccountMailboxes:
       type: object
       properties:
@@ -1671,6 +1717,12 @@ components:
         updatedAt: { type: string, format: date-time }
         completedAt: { type: string, format: date-time }
       required: [id, type, status, done, total, unit, updatedAt]
+    LogEntry:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        line: { type: string }
+      required: [id, line]
     ConcurrencySettings:
       type: object
       properties:
@@ -1716,6 +1768,15 @@ components:
         resources: { $ref: '#/components/schemas/ResourceInfo' }
         sessionTtlHours: { type: integer }
         syncIntervalSeconds: { type: integer }
+        otherMailboxSyncIntervalSeconds: { type: integer }
+        autoSync: { type: boolean }
+        realTimeReceive: { type: boolean }
+        startupSync: { type: boolean }
+        maxImapConnectionsPerAccount: { type: integer }
+        imapWorkIdleTimeoutSeconds: { type: integer }
+        maxImapConnectionsPerServer: { type: integer }
+        maxConcurrentSyncsPerServer: { type: integer }
+        autoReconnect: { type: boolean }
         pop3IntervalSeconds: { type: integer }
         bodyPrefetchMaxBytes: { type: integer }
         maxAttachmentBytes: { type: integer }
@@ -1724,7 +1785,7 @@ components:
         googleSecretSet: { type: boolean }
         microsoftSecretSet: { type: boolean }
         logLevel: { type: string, enum: [debug, info, warn, error] }
-      required: [defaultInitialSyncRange, defaultDownloadScope, preserveMarkedOnAccountDelete, sentSyncMode, draftSyncMode, draftPullIntervalSeconds, draftPushDelaySeconds, composeWindowMode, sendRetryLimit, networkAvatars, gravatarAvatars, bimiAvatars, googleFaviconAvatars, timezone, language, removeReadImmediately, prependNewMessages, envelopeBatchSize, searchConcurrency, indexBatchSize, autoLocalConcurrency, concurrency, resources, sessionTtlHours, syncIntervalSeconds, pop3IntervalSeconds, bodyPrefetchMaxBytes, maxAttachmentBytes, googleClientId, microsoftClientId, googleSecretSet, microsoftSecretSet]
+      required: [defaultInitialSyncRange, defaultDownloadScope, preserveMarkedOnAccountDelete, sentSyncMode, draftSyncMode, draftPullIntervalSeconds, draftPushDelaySeconds, composeWindowMode, sendRetryLimit, networkAvatars, gravatarAvatars, bimiAvatars, googleFaviconAvatars, timezone, language, removeReadImmediately, prependNewMessages, envelopeBatchSize, searchConcurrency, indexBatchSize, autoLocalConcurrency, concurrency, resources, sessionTtlHours, syncIntervalSeconds, otherMailboxSyncIntervalSeconds, autoSync, realTimeReceive, startupSync, maxImapConnectionsPerAccount, imapWorkIdleTimeoutSeconds, maxImapConnectionsPerServer, maxConcurrentSyncsPerServer, autoReconnect, pop3IntervalSeconds, bodyPrefetchMaxBytes, maxAttachmentBytes, googleClientId, microsoftClientId, googleSecretSet, microsoftSecretSet]
     SettingsUpdate:
       type: object
       properties:
@@ -1754,6 +1815,15 @@ components:
         sessionTtlHours: { type: integer, minimum: 1, maximum: 8760 }
         syncIntervalSeconds: { type: integer, minimum: 30, maximum: 86400 }
         pop3IntervalSeconds: { type: integer, minimum: 30, maximum: 86400 }
+        otherMailboxSyncIntervalSeconds: { type: integer, minimum: 30, maximum: 86400 }
+        autoSync: { type: boolean }
+        realTimeReceive: { type: boolean }
+        startupSync: { type: boolean }
+        maxImapConnectionsPerAccount: { type: integer, minimum: 1, maximum: 3 }
+        imapWorkIdleTimeoutSeconds: { type: integer, minimum: 60, maximum: 3600 }
+        maxImapConnectionsPerServer: { type: integer, minimum: 1, maximum: 64 }
+        maxConcurrentSyncsPerServer: { type: integer, minimum: 1, maximum: 32 }
+        autoReconnect: { type: boolean }
         bodyPrefetchMaxBytes: { type: integer, minimum: 0, maximum: 1073741824 }
         maxAttachmentBytes: { type: integer, minimum: 1048576, maximum: 1073741824 }
         googleClientId: { type: string }

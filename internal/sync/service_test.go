@@ -2,28 +2,92 @@ package sync
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/mailquay/mailquay/internal/imapclient"
 	"github.com/mailquay/mailquay/internal/netpace"
+	"github.com/mailquay/mailquay/internal/settings"
+	"github.com/mailquay/mailquay/internal/store/sqlcgen"
 )
 
-func TestDialIMAPSkipsPacingForInteractive(t *testing.T) {
-	svc := &Service{pacer: netpace.New(time.Hour)}
+func TestDialIMAPHonorsPacingForInteractive(t *testing.T) {
+	pacer := netpace.New(time.Hour)
+	svc := &Service{pacer: pacer, settings: &settings.Service{}}
 	addr := "127.0.0.1:1"
-	if err := svc.pacer.Wait(context.Background(), addr); err != nil {
+	if err := pacer.Wait(context.Background(), addr); err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(netpace.WithInteractive(context.Background()), 30*time.Millisecond)
 	defer cancel()
-	if _, err := svc.dialIMAP(netpace.WithInteractive(ctx), imapclient.Config{
+	_, err := svc.dialIMAP(ctx, imapclient.Config{
 		Address: addr, Security: "none", Timeout: time.Second,
-	}); err == nil {
-		t.Fatal("dial to a closed port succeeded")
+	})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("interactive dial error = %v, want pacing deadline", err)
 	}
-	if ctx.Err() != nil {
-		t.Fatal("interactive dial waited for the background pacing slot")
+}
+
+func TestMergeSyncRequestsDeduplicatesAndPromotesFullSync(t *testing.T) {
+	firstMailbox, secondMailbox := uuid.New(), uuid.New()
+	var pending []syncRequest
+	mergeSyncRequest(&pending, syncRequest{mailboxID: firstMailbox, priority: 1})
+	mergeSyncRequest(&pending, syncRequest{mailboxID: firstMailbox, priority: 3, manual: true})
+	if len(pending) != 1 || pending[0].priority != 3 || !pending[0].manual {
+		t.Fatalf("duplicate request merge = %+v", pending)
+	}
+
+	mergeSyncRequest(&pending, syncRequest{mailboxID: secondMailbox, priority: 2})
+	mergeSyncRequest(&pending, syncRequest{priority: 2})
+	if len(pending) != 1 || pending[0].mailboxID != uuid.Nil ||
+		pending[0].priority != 3 || !pending[0].manual {
+		t.Fatalf("full sync did not subsume mailbox requests: %+v", pending)
+	}
+	mergeSyncRequest(&pending, syncRequest{mailboxID: secondMailbox, priority: 3})
+	if len(pending) != 1 || pending[0].mailboxID != uuid.Nil {
+		t.Fatalf("mailbox request duplicated a pending full sync: %+v", pending)
+	}
+}
+
+func TestMailboxSyncIntervalsAndJitter(t *testing.T) {
+	values := settings.Defaults()
+	if got := mailboxInterval(sqlcgen.Mailbox{Role: "inbox"}, values); got != 10*time.Minute {
+		t.Fatalf("inbox interval = %v, want 10m", got)
+	}
+	if got := mailboxInterval(sqlcgen.Mailbox{Role: "custom"}, values); got != 15*time.Minute {
+		t.Fatalf("other mailbox interval = %v, want 15m", got)
+	}
+	for range 100 {
+		got := jitterInterval(10 * time.Minute)
+		if got < 9*time.Minute || got > 11*time.Minute {
+			t.Fatalf("jitter interval = %v, want 9m–11m", got)
+		}
+	}
+}
+
+func TestIdleCapacityReservesConcurrentWorkerSlots(t *testing.T) {
+	cases := []struct {
+		accountCount    int
+		perAccountLimit int
+		perServerLimit  int
+		syncLimit       int
+		want            bool
+	}{
+		{accountCount: 1, perAccountLimit: 1, perServerLimit: 1, syncLimit: 2, want: true},
+		{accountCount: 1, perAccountLimit: 2, perServerLimit: 1, syncLimit: 2, want: false},
+		{accountCount: 3, perAccountLimit: 1, perServerLimit: 3, syncLimit: 2, want: true},
+		{accountCount: 3, perAccountLimit: 2, perServerLimit: 4, syncLimit: 2, want: false},
+		{accountCount: 3, perAccountLimit: 2, perServerLimit: 5, syncLimit: 2, want: true},
+		{accountCount: 5, perAccountLimit: 2, perServerLimit: 7, syncLimit: 2, want: true},
+	}
+	for _, tc := range cases {
+		if got := idleCapacityFits(tc.accountCount, tc.perAccountLimit, tc.perServerLimit, tc.syncLimit); got != tc.want {
+			t.Errorf("idleCapacityFits(%d, %d, %d, %d) = %v, want %v",
+				tc.accountCount, tc.perAccountLimit, tc.perServerLimit, tc.syncLimit, got, tc.want)
+		}
 	}
 }
 

@@ -40,10 +40,6 @@ import (
 // paced by the remote endpoint instead of local concurrency alone.
 const dialInterval = 2 * time.Second
 
-// sessionIdleTimeout closes an account's idle IMAP connection so it does not
-// hold a server slot between syncs.
-const sessionIdleTimeout = 3 * time.Minute
-
 // App is the assembled server process.
 type App struct {
 	cfg       *config.Config
@@ -65,7 +61,7 @@ type App struct {
 
 // New assembles all dependencies.
 func New(ctx context.Context, cfg *config.Config) (*App, error) {
-	logger, levelVar := platform.NewLoggerLevel(cfg.LogLevel, cfg.LogFormat)
+	logger, levelVar, logs := platform.NewLoggerLevel(cfg.LogLevel, cfg.LogFormat)
 	cipher, err := crypto.NewFromBase64(cfg.SecretKey)
 	if err != nil {
 		return nil, err
@@ -93,9 +89,13 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 	settingsSvc := settings.NewService(st, resources, cipher, settings.Bootstrap{
 		LogLevel: cfg.LogLevel,
 	})
+	var sessions *mailsession.Pool
 	settingsSvc.OnChange = func(values settings.Values) {
 		levelVar.Set(platform.ParseLevel(values.LogLevel))
 		index.SetQueryLimit(settings.EffectiveConcurrency(values, settingsSvc.Resources()).SearchConcurrency)
+		if sessions != nil {
+			sessions.Configure(values.MaxIMAPConnectionsPerAccount, time.Duration(values.IMAPWorkIdleTimeoutSeconds)*time.Second)
+		}
 	}
 	snap, err := settingsSvc.Get(ctx)
 	if err != nil {
@@ -109,9 +109,12 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 
 	hub := events.NewHub()
 	pacer := netpace.New(dialInterval)
-	sessions := mailsession.NewPool(sessionIdleTimeout)
+	sessions = mailsession.NewPool(time.Duration(snap.Values.IMAPWorkIdleTimeoutSeconds) * time.Second)
+	sessions.Configure(snap.Values.MaxIMAPConnectionsPerAccount, time.Duration(snap.Values.IMAPWorkIdleTimeoutSeconds)*time.Second)
 	accounts := account.NewService(st, cipher, logger)
 	accounts.SetSettings(settingsSvc)
+	accounts.SetPacer(pacer)
+	accounts.SetSessions(sessions)
 	mailboxes := mailbox.NewService(st)
 	messages := message.NewService(st, hub, blobs, logger)
 	if removed, err := messages.CleanupMovedDuplicates(ctx); err != nil {
@@ -148,6 +151,7 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 			logger.Warn("apply special folders", "account", accountID, "error", err)
 		}
 		hub.Publish("account.updated", map[string]any{"accountId": accountID.String()})
+		syncSvc.AccountUpdated(accountID)
 		hub.Publish("mailbox.updated", map[string]any{"accountId": accountID.String()})
 	}
 	accounts.OnScope = func(ctx context.Context, accountID uuid.UUID) { syncSvc.ReconcileScope(ctx, accountID) }
@@ -166,7 +170,7 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 		st.Close()
 		return nil, err
 	}
-	server := httpapi.NewServer(st, cfg, authSvc, accounts, mailboxes, messages, composeSvc, settingsSvc, syncSvc, index, hub, blobs, logger, cipher)
+	server := httpapi.NewServer(st, cfg, authSvc, accounts, mailboxes, messages, composeSvc, settingsSvc, syncSvc, index, hub, blobs, logger, cipher, logs)
 	handler := httpapi.NewRouter(server, hub, logger)
 	httpServer := &http.Server{
 		Addr:              cfg.ListenAddr,
@@ -178,7 +182,7 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 	app := &App{
 		cfg: cfg, logger: logger, store: st, blobs: blobs, index: index, hub: hub,
 		settings: settingsSvc, sync: syncSvc, compose: composeSvc, messages: messages,
-		accounts: accounts, server: httpServer, indexer: indexer,
+		accounts: accounts, sessions: sessions, server: httpServer, indexer: indexer,
 	}
 	return app, nil
 }

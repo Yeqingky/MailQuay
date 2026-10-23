@@ -21,6 +21,7 @@ import (
 	"github.com/mailquay/mailquay/internal/httpapi/oapi"
 	"github.com/mailquay/mailquay/internal/mailbox"
 	"github.com/mailquay/mailquay/internal/message"
+	"github.com/mailquay/mailquay/internal/platform"
 	"github.com/mailquay/mailquay/internal/search"
 	"github.com/mailquay/mailquay/internal/settings"
 	"github.com/mailquay/mailquay/internal/storage"
@@ -45,6 +46,7 @@ type Server struct {
 	hub            *events.Hub
 	blobs          *storage.Store
 	logger         *slog.Logger
+	logs           *platform.LogBuffer
 	oauth          *OAuth
 	cipher         *crypto.Cipher
 }
@@ -53,11 +55,11 @@ type Server struct {
 func NewServer(st *store.Store, cfg *config.Config, authSvc *auth.Service, accounts *account.Service,
 	mailboxes *mailbox.Service, messages *message.Service, composeSvc *compose.Service,
 	settingsSvc *settings.Service, syncSvc *syncservice.Service, index *search.Index, hub *events.Hub,
-	blobs *storage.Store, logger *slog.Logger, cipher *crypto.Cipher) *Server {
+	blobs *storage.Store, logger *slog.Logger, cipher *crypto.Cipher, logs *platform.LogBuffer) *Server {
 	return &Server{
 		store: st, cfg: cfg, auth: authSvc, accounts: accounts, mailboxes: mailboxes,
 		messages: messages, compose: composeSvc, settings: settingsSvc, avatarSettings: settingsSvc, sync: syncSvc,
-		index: index, hub: hub, blobs: blobs, logger: logger, cipher: cipher,
+		index: index, hub: hub, blobs: blobs, logger: logger, cipher: cipher, logs: logs,
 		oauth: NewOAuth(cfg, settingsSvc, st, accounts, cipher),
 	}
 }

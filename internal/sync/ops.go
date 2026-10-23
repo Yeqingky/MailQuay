@@ -196,10 +196,16 @@ func (s *Service) retryOp(ctx context.Context, op sqlcgen.PendingOp, cause error
 
 func (s *Service) startIdleWorker(parent context.Context, accountID uuid.UUID) {
 	s.mu.Lock()
+	if s.noIdle[accountID] || s.authBlocked[accountID] || s.autoBlocked[accountID] {
+		s.mu.Unlock()
+		return
+	}
 	if _, exists := s.idle[accountID]; exists {
 		s.mu.Unlock()
 		return
 	}
+	s.idleRunID[accountID]++
+	runID := s.idleRunID[accountID]
 	ctx, cancel := context.WithCancel(parent)
 	s.idle[accountID] = cancel
 	s.mu.Unlock()
@@ -208,7 +214,9 @@ func (s *Service) startIdleWorker(parent context.Context, accountID uuid.UUID) {
 		defer s.wg.Done()
 		defer func() {
 			s.mu.Lock()
-			delete(s.idle, accountID)
+			if s.idleRunID[accountID] == runID {
+				delete(s.idle, accountID)
+			}
 			s.mu.Unlock()
 			cancel()
 		}()
@@ -225,40 +233,59 @@ func (s *Service) idleLoop(ctx context.Context, accountID uuid.UUID) {
 	if err != nil {
 		return
 	}
+	inbox, err := s.store.GetMailboxByRole(ctx, sqlcgen.GetMailboxByRoleParams{AccountID: acct.ID, Role: "inbox"})
+	if err != nil {
+		return
+	}
+	dial := s.imapDialer(acct, creds)
 	backoff := 30 * time.Second
-	for {
-		select {
-		case <-ctx.Done():
+	for ctx.Err() == nil {
+		values := s.settings.Current()
+		if !values.RealTimeReceive {
 			return
-		default:
 		}
-		client, err := s.dialIMAP(ctx, s.imapConfig(acct, creds))
+		s.mu.Lock()
+		blocked := s.authBlocked[accountID] || s.autoBlocked[accountID]
+		s.mu.Unlock()
+		if blocked {
+			return
+		}
+
+		changed, _, err := s.sessions.RunIdleRound(ctx, acct.ID, inbox.Path, 25*time.Minute, dial)
+		if errors.Is(err, mailsession.ErrIdleUnsupported) {
+			s.mu.Lock()
+			s.noIdle[accountID] = true
+			s.mu.Unlock()
+			s.logger.Info("imap IDLE unsupported; using periodic sync", "account", accountID)
+			return
+		}
 		if err != nil {
-			if !sleepCtx(ctx, backoff) {
+			if isRateLimitError(err) {
+				backoff = max(backoff, s.pacer.ReportRateLimit(accountSyncAddress(acct)))
+			}
+			if errors.Is(err, imapclient.ErrAuthentication) {
+				err = fmt.Errorf("%w; update the account credentials", err)
+				s.setAccountError(ctx, accountID, err)
+				s.mu.Lock()
+				s.authBlocked[accountID] = true
+				s.mu.Unlock()
 				return
 			}
-			if backoff < 10*time.Minute {
-				backoff *= 2
+			if !values.AutoReconnect {
+				s.mu.Lock()
+				s.autoBlocked[accountID] = true
+				s.mu.Unlock()
+				return
 			}
+			if !sleepCtx(ctx, jitterInterval(backoff)) {
+				return
+			}
+			backoff = min(backoff*2, 10*time.Minute)
 			continue
 		}
-		inbox, err := s.store.GetMailboxByRole(ctx, sqlcgen.GetMailboxByRoleParams{AccountID: acct.ID, Role: "inbox"})
-		if err == nil {
-			if _, err := client.Select(ctx, inbox.Path); err == nil {
-				for ctx.Err() == nil {
-					changed, err := client.Idle(ctx, 25*time.Minute)
-					if err != nil {
-						break
-					}
-					if changed {
-						s.TriggerAccount(acct.ID)
-					}
-				}
-			}
-		}
-		_ = client.Close()
-		if !sleepCtx(ctx, 5*time.Second) {
-			return
+		backoff = 30 * time.Second
+		if changed {
+			s.enqueueRequest(ctx, syncRequest{accountID: acct.ID, mailboxID: inbox.ID, priority: 2})
 		}
 	}
 }

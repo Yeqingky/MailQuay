@@ -39,6 +39,9 @@ const (
 	maxUint32      = ^uint32(0)
 )
 
+// ErrAuthentication identifies an IMAP authentication rejection.
+var ErrAuthentication = errors.New("imapclient: authentication failed")
+
 // Address is an envelope address. Name may be empty.
 type Address struct {
 	Name  string
@@ -130,8 +133,11 @@ type Client struct {
 	changes chan struct{}
 	caps    imap.CapSet
 
-	closeOnce sync.Once
-	closeErr  error
+	closeOnce     sync.Once
+	closeErr      error
+	closeHookMu   sync.Mutex
+	closeHook     func()
+	closeHookOnce sync.Once
 }
 
 // staticRSACipherSuites use the RSA key exchange. Go stopped offering them by
@@ -334,7 +340,38 @@ func (c *Client) Close() error {
 			c.closeErr = nil
 		}
 	})
+	c.notifyClosed()
 	return c.closeErr
+}
+
+// SetCloseHook registers a callback that runs once when the connection closes.
+func (c *Client) SetCloseHook(hook func()) {
+	if c == nil || hook == nil {
+		return
+	}
+	c.closeHookMu.Lock()
+	if c.closeHook == nil {
+		c.closeHook = hook
+	}
+	c.closeHookMu.Unlock()
+	if c.Closed() {
+		c.notifyClosed()
+	}
+}
+
+// SupportsIdle reports whether the server advertised IDLE.
+func (c *Client) SupportsIdle() bool {
+	return c != nil && c.hasCap(imap.CapIdle)
+}
+
+// SupportsCondStore reports whether the server advertised CONDSTORE.
+func (c *Client) SupportsCondStore() bool {
+	return c != nil && c.hasCap(imap.CapCondStore)
+}
+
+// Ping checks a reusable connection with IMAP NOOP.
+func (c *Client) Ping(ctx context.Context) error {
+	return c.do(ctx, func() error { return c.c.Noop().Wait() })
 }
 
 func (c *Client) waitGreeting(ctx context.Context) error {
@@ -345,10 +382,16 @@ func (c *Client) waitGreeting(ctx context.Context) error {
 
 func (c *Client) authenticate(ctx context.Context, cfg Config) error {
 	return c.do(ctx, func() error {
+		var err error
 		if cfg.AccessToken != "" {
-			return c.c.Authenticate(&xoauth2Client{username: cfg.Username, token: cfg.AccessToken})
+			err = c.c.Authenticate(&xoauth2Client{username: cfg.Username, token: cfg.AccessToken})
+		} else {
+			err = c.c.Login(cfg.Username, cfg.Password).Wait()
 		}
-		return c.c.Login(cfg.Username, cfg.Password).Wait()
+		if err != nil {
+			return fmt.Errorf("%w: %v", ErrAuthentication, err)
+		}
+		return nil
 	})
 }
 
@@ -659,6 +702,19 @@ func bareAddress(value string) string {
 
 // FetchFlags returns the current flags for uids.
 func (c *Client) FetchFlags(ctx context.Context, uids []uint32) ([]FlagUpdate, error) {
+	return c.fetchFlags(ctx, uids, nil)
+}
+
+// FetchFlagsChangedSince returns flag changes with mod-sequences newer than
+// since. The server must support CONDSTORE.
+func (c *Client) FetchFlagsChangedSince(ctx context.Context, uids []uint32, since uint64) ([]FlagUpdate, error) {
+	if !c.SupportsCondStore() {
+		return nil, errors.New("imapclient: server does not support CONDSTORE")
+	}
+	return c.fetchFlags(ctx, uids, &since)
+}
+
+func (c *Client) fetchFlags(ctx context.Context, uids []uint32, changedSince *uint64) ([]FlagUpdate, error) {
 	if len(uids) == 0 {
 		return nil, nil
 	}
@@ -670,6 +726,9 @@ func (c *Client) FetchFlags(ctx context.Context, uids []uint32) ([]FlagUpdate, e
 		opts := &imap.FetchOptions{
 			Flags:  true,
 			ModSeq: c.hasCap(imap.CapCondStore),
+		}
+		if changedSince != nil {
+			opts.ChangedSince = *changedSince
 		}
 		bufs, err := c.c.Fetch(uidSet(uids), opts).Collect()
 		if err != nil {
@@ -919,8 +978,22 @@ func (c *Client) Status(ctx context.Context, path string) (MailboxStatus, error)
 // It returns true when the server advertised a change during the round. A
 // timeout with no change is not an error; a canceled context is.
 func (c *Client) Idle(ctx context.Context, timeout time.Duration) (bool, error) {
+	changed, _, err := c.IdleInterruptible(ctx, timeout, nil)
+	return changed, err
+}
+
+// IdleInterruptible exits IDLE cleanly when interrupt is closed, preserving
+// the connection for the next serialized operation.
+func (c *Client) IdleInterruptible(ctx context.Context, timeout time.Duration, interrupt <-chan struct{}) (changed, interrupted bool, err error) {
 	if ctx == nil {
 		ctx = context.Background()
+	}
+	if interrupt != nil {
+		select {
+		case <-interrupt:
+			return false, true, nil
+		default:
+		}
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -932,7 +1005,6 @@ func (c *Client) Idle(ctx context.Context, timeout time.Duration) (bool, error) 
 		defer cancel()
 	}
 
-	// Drop a notification left over from an earlier command.
 	select {
 	case <-c.changes:
 	default:
@@ -945,25 +1017,24 @@ func (c *Client) Idle(ctx context.Context, timeout time.Duration) (bool, error) 
 		<-watchDone
 		_ = c.conn.SetDeadline(time.Time{})
 		c.disconnect()
-		return false, wrapContext(ctx, fmt.Errorf("idle: %w", err))
+		return false, false, wrapContext(ctx, fmt.Errorf("idle: %w", err))
 	}
 
-	changed := false
 	select {
 	case <-c.changes:
 		changed = true
+	case <-interrupt:
+		interrupted = true
 	case <-ctx.Done():
 	}
 
-	// Stop the watcher first: on a normal timeout its deadline interrupt
-	// would otherwise prevent DONE from being written.
 	stop()
 	<-watchDone
 
 	if parent.Err() != nil {
 		c.disconnect()
 		_ = idle.Close()
-		return false, fmt.Errorf("imapclient: idle: %w", parent.Err())
+		return false, false, fmt.Errorf("imapclient: idle: %w", parent.Err())
 	}
 
 	_ = c.conn.SetDeadline(time.Now().Add(c.timeout))
@@ -973,9 +1044,9 @@ func (c *Client) Idle(ctx context.Context, timeout time.Duration) (bool, error) 
 
 	if err := errors.Join(closeErr, waitErr); err != nil {
 		c.disconnect()
-		return changed, fmt.Errorf("imapclient: idle: %w", err)
+		return changed, interrupted, fmt.Errorf("imapclient: idle: %w", err)
 	}
-	return changed, nil
+	return changed, interrupted, nil
 }
 
 func (c *Client) do(ctx context.Context, fn func() error) error {
@@ -1015,10 +1086,15 @@ func (c *Client) signal() {
 }
 
 func (c *Client) disconnect() {
-	if c.c != nil {
-		_ = c.c.Close()
-	} else if c.conn != nil {
-		_ = c.conn.Close()
+	_ = c.Close()
+}
+
+func (c *Client) notifyClosed() {
+	c.closeHookMu.Lock()
+	hook := c.closeHook
+	c.closeHookMu.Unlock()
+	if hook != nil {
+		c.closeHookOnce.Do(hook)
 	}
 }
 

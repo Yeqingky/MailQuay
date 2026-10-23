@@ -70,6 +70,76 @@ func TestHostKeyIgnoresPort(t *testing.T) {
 	}
 }
 
+func TestConnectionLimitIsSharedAcrossPortsAndReleased(t *testing.T) {
+	p := New(0)
+	release, err := p.AcquireConnection(context.Background(), "imap.example.com:993", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+	if _, err := p.AcquireConnection(ctx, "imap.example.com:143", 1); err != context.DeadlineExceeded {
+		t.Fatalf("second connection error = %v, want deadline exceeded", err)
+	}
+	release()
+	releaseAgain, err := p.AcquireConnection(context.Background(), "imap.example.com:143", 1)
+	if err != nil {
+		t.Fatalf("connection slot was not released: %v", err)
+	}
+	releaseAgain()
+}
+
+func TestSyncLimitIsIndependentAndAdaptsAfterThrottling(t *testing.T) {
+	p := New(0)
+	releaseSync, err := p.AcquireSync(context.Background(), "imap.example.com:993", 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	releaseConn, err := p.AcquireConnection(context.Background(), "imap.example.com:993", 1)
+	if err != nil {
+		t.Fatalf("connection limit shared sync slots: %v", err)
+	}
+	releaseConn()
+	p.ReportRateLimit("imap.example.com:143")
+	releaseSync()
+
+	p.mu.Lock()
+	state := p.hosts["imap.example.com"]
+	if state == nil || state.adaptiveSyncLimit != 2 {
+		p.mu.Unlock()
+		t.Fatalf("adaptive sync limit = %v, want 2", state)
+	}
+	p.mu.Unlock()
+
+	p.ReportSuccess("imap.example.com:993")
+	p.mu.Lock()
+	state = p.hosts["imap.example.com"]
+	got := state.adaptiveSyncLimit
+	p.mu.Unlock()
+	if got != 3 {
+		t.Fatalf("successful sync restored limit to %d, want 3", got)
+	}
+}
+
+func TestServerSyncConcurrencyIsSharedAcrossPorts(t *testing.T) {
+	p := New(0)
+	release, err := p.AcquireSync(context.Background(), "imap.example.com:993", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+	if _, err := p.AcquireSync(ctx, "imap.example.com:143", 1); err != context.DeadlineExceeded {
+		t.Fatalf("second sync error = %v, want deadline exceeded", err)
+	}
+	release()
+	releaseAgain, err := p.AcquireSync(context.Background(), "imap.example.com:143", 1)
+	if err != nil {
+		t.Fatalf("sync slot was not released: %v", err)
+	}
+	releaseAgain()
+}
+
 func TestInteractiveMarker(t *testing.T) {
 	if IsInteractive(context.Background()) {
 		t.Fatal("background context reported as interactive")

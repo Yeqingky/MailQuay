@@ -75,3 +75,41 @@ func TestValidate(t *testing.T) {
 		t.Fatal("expected index batch rejection")
 	}
 }
+func TestIMAPSyncSettingsDefaultsAndBounds(t *testing.T) {
+	values := Defaults()
+	if values.SyncIntervalSeconds != 600 || values.OtherMailboxSyncIntervalSeconds != 900 ||
+		!values.AutoSync || !values.RealTimeReceive || !values.StartupSync ||
+		values.MaxIMAPConnectionsPerAccount != 2 || values.IMAPWorkIdleTimeoutSeconds != 600 ||
+		values.MaxIMAPConnectionsPerServer != 8 || values.MaxConcurrentSyncsPerServer != 2 ||
+		!values.AutoReconnect {
+		t.Fatalf("unexpected IMAP sync defaults: %+v", values)
+	}
+	if err := validate(values); err != nil {
+		t.Fatalf("default settings rejected: %v", err)
+	}
+
+	tests := []struct {
+		name   string
+		mutate func(*Values)
+	}{
+		{"inbox interval below minimum", func(v *Values) { v.SyncIntervalSeconds = 29 }},
+		{"other folder interval above maximum", func(v *Values) { v.OtherMailboxSyncIntervalSeconds = 86401 }},
+		{"account connections below minimum", func(v *Values) { v.MaxIMAPConnectionsPerAccount = 0 }},
+		{"account connections above maximum", func(v *Values) { v.MaxIMAPConnectionsPerAccount = 4 }},
+		{"worker timeout below minimum", func(v *Values) { v.IMAPWorkIdleTimeoutSeconds = 59 }},
+		{"worker timeout above maximum", func(v *Values) { v.IMAPWorkIdleTimeoutSeconds = 3601 }},
+		{"server connections below minimum", func(v *Values) { v.MaxIMAPConnectionsPerServer = 0 }},
+		{"server connections above maximum", func(v *Values) { v.MaxIMAPConnectionsPerServer = 65 }},
+		{"server syncs below minimum", func(v *Values) { v.MaxConcurrentSyncsPerServer = 0 }},
+		{"server syncs above maximum", func(v *Values) { v.MaxConcurrentSyncsPerServer = 33 }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			candidate := Defaults()
+			test.mutate(&candidate)
+			if err := validate(candidate); err == nil {
+				t.Fatal("invalid setting accepted")
+			}
+		})
+	}
+}

@@ -98,7 +98,7 @@ func loggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 			start := time.Now()
 			sw := &statusWriter{ResponseWriter: w, status: 200}
 			next.ServeHTTP(sw, r)
-			if strings.HasPrefix(r.URL.Path, "/api/") {
+			if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/v1/logs" {
 				logger.Info("http", "method", r.Method, "path", r.URL.Path, "status", sw.status, "duration", time.Since(start))
 			}
 		})

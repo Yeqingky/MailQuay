@@ -19,14 +19,15 @@ import (
 type Pacer struct {
 	interval time.Duration
 
-	mu   sync.Mutex
-	next map[string]time.Time
+	mu    sync.Mutex
+	next  map[string]time.Time
+	hosts map[string]*hostState
 }
 
 // New returns a Pacer that starts at most one connection per host every
 // interval. Non-positive intervals disable pacing.
 func New(interval time.Duration) *Pacer {
-	return &Pacer{interval: interval, next: make(map[string]time.Time)}
+	return &Pacer{interval: interval, next: make(map[string]time.Time), hosts: make(map[string]*hostState)}
 }
 
 // Interval reports the configured spacing per host.

@@ -17,6 +17,8 @@ import (
 
 // ErrNotFound is returned for missing mailboxes.
 var ErrNotFound = errors.New("mailbox not found")
+var ErrInvalidSyncMode = errors.New("invalid mailbox sync mode")
+var ErrLocalMailboxSync = errors.New("local mailboxes cannot be configured for remote sync")
 
 // Counts is the global sidebar counter set.
 type Counts struct {
@@ -64,6 +66,24 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (sqlcgen.Mailbox, error
 		return sqlcgen.Mailbox{}, fmt.Errorf("load mailbox: %w", err)
 	}
 	return mb, nil
+}
+
+// SetSyncMode updates whether and how a remote mailbox participates in sync.
+func (s *Service) SetSyncMode(ctx context.Context, id uuid.UUID, mode string) (sqlcgen.Mailbox, error) {
+	if mode != "full" && mode != "pull" && mode != "off" {
+		return sqlcgen.Mailbox{}, ErrInvalidSyncMode
+	}
+	mb, err := s.Get(ctx, id)
+	if err != nil {
+		return sqlcgen.Mailbox{}, err
+	}
+	if mb.LocalOnly {
+		return sqlcgen.Mailbox{}, ErrLocalMailboxSync
+	}
+	if err := s.store.SetMailboxSyncMode(ctx, sqlcgen.SetMailboxSyncModeParams{ID: id, SyncMode: mode}); err != nil {
+		return sqlcgen.Mailbox{}, fmt.Errorf("update mailbox sync mode: %w", err)
+	}
+	return s.Get(ctx, id)
 }
 
 // Tree builds the sidebar tree with global counters.

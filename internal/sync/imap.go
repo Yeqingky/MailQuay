@@ -57,15 +57,30 @@ func (s *Service) imapConfig(acct sqlcgen.Account, creds account.Credentials) im
 	}
 }
 
-// syncIMAP lists folders and syncs every mailbox on one connection.
-//
-// A dead connection aborts the pass: retryable is true while another attempt is
-// still allowed, so the mailbox that hit the failure is not marked failed only
-// to have the retry clear it. Mailboxes that were never attempted keep their
-// state as well. The returned error wraps errConnectionLost so the caller can
-// redial and rerun the pass; on the last attempt the failing mailbox is marked
-// instead and the pass ends without an account-level error.
-func (s *Service) syncIMAP(ctx context.Context, client *imapclient.Client, acct sqlcgen.Account, retryable bool) error {
+// syncIMAP either synchronizes one requested mailbox or discovers folders and
+// runs a full account pass on the worker connection.
+func (s *Service) syncIMAP(ctx context.Context, client *imapclient.Client, acct sqlcgen.Account, mailboxID uuid.UUID, retryable bool) error {
+	if mailboxID != uuid.Nil {
+		mb, err := s.store.GetMailbox(ctx, mailboxID)
+		if err != nil {
+			return fmt.Errorf("load mailbox: %w", err)
+		}
+		if mb.AccountID != acct.ID {
+			return errors.New("mailbox does not belong to account")
+		}
+		if !eligibleMailbox(mb, s.settings.Current()) {
+			return nil
+		}
+		if err := s.syncIMAPMailbox(ctx, client, acct, mb); err != nil {
+			if client.Closed() && retryable {
+				return fmt.Errorf("%w: %v", errConnectionLost, err)
+			}
+			s.markMailboxError(ctx, acct, mb, err)
+			return err
+		}
+		return nil
+	}
+
 	folders, err := client.List(ctx)
 	if err != nil {
 		if client.Closed() {
@@ -85,18 +100,12 @@ func (s *Service) syncIMAP(ctx context.Context, client *imapclient.Client, acct 
 		return err
 	}
 	for _, mb := range mailboxes {
-		if mb.LocalOnly || mb.SyncMode == "off" || mb.Role == "drafts" {
-			continue
-		}
-		if mb.Role == "sent" && snap.Values.SentSyncMode == "off" {
+		if !eligibleMailbox(mb, snap.Values) {
 			continue
 		}
 		if err := s.syncIMAPMailbox(ctx, client, acct, mb); err != nil {
 			if client.Closed() {
 				if !retryable {
-					// The retry lost the connection as well. Record the failure
-					// on the mailbox that hit it and stop this pass; the account
-					// stays usable and untouched mailboxes keep their state.
 					s.markMailboxError(ctx, acct, mb, err)
 					return nil
 				}
@@ -106,7 +115,7 @@ func (s *Service) syncIMAP(ctx context.Context, client *imapclient.Client, acct 
 		}
 	}
 	if snap.Values.DraftSyncMode != "local" {
-		if draftsBox, err := s.store.GetMailboxByRole(ctx, sqlcgen.GetMailboxByRoleParams{AccountID: acct.ID, Role: "drafts"}); err == nil {
+		if draftsBox, err := s.store.GetMailboxByRole(ctx, sqlcgen.GetMailboxByRoleParams{AccountID: acct.ID, Role: "drafts"}); err == nil && draftsBox.SyncMode != "off" {
 			if err := s.pullDrafts(ctx, client, acct, draftsBox); err != nil {
 				s.logger.Debug("pull drafts", "account", acct.ID, "error", err)
 			}
@@ -117,7 +126,7 @@ func (s *Service) syncIMAP(ctx context.Context, client *imapclient.Client, acct 
 
 // markMailboxError records a mailbox-level failure and notifies the UI.
 func (s *Service) markMailboxError(ctx context.Context, acct sqlcgen.Account, mb sqlcgen.Mailbox, cause error) {
-	s.logger.Warn("sync mailbox", "account", acct.ID, "mailbox", mb.Path, "error", cause)
+	s.logger.Warn("sync mailbox", "account", acct.Email, "protocol", "IMAP", "mailbox", mb.Path, "error", cause)
 	_ = s.store.UpdateMailboxState(ctx, sqlcgen.UpdateMailboxStateParams{
 		ID: mb.ID, Uidvalidity: mb.Uidvalidity, Uidnext: mb.Uidnext, Highestmodseq: mb.Highestmodseq,
 		SyncState: "error", LastSyncedAt: mb.LastSyncedAt, LastError: cause.Error(),
@@ -140,6 +149,7 @@ func (s *Service) syncIMAPMailbox(ctx context.Context, client *imapclient.Client
 	}); err != nil {
 		return err
 	}
+	s.logger.Info("synchronizing mailbox", "account", acct.Email, "protocol", "IMAP", "mailbox", mb.Path)
 	selected, err := client.Select(ctx, mb.Path)
 	if err != nil {
 		return fmt.Errorf("select %s: %w", mb.Path, err)
@@ -153,6 +163,7 @@ func (s *Service) syncIMAPMailbox(ctx context.Context, client *imapclient.Client
 		initial = true
 		mb.Uidvalidity = nil
 		mb.Uidnext = nil
+		mb.Highestmodseq = nil
 	}
 	uids, err := s.mailboxNewUIDs(ctx, client, acct, mb, initial)
 	if err != nil {
@@ -191,6 +202,11 @@ func (s *Service) syncIMAPMailbox(ctx context.Context, client *imapclient.Client
 		done += len(batch)
 		s.updateTask(ctx, taskType, &acct.ID, int32(done), int32(len(uids)), "syncing "+mb.Path)
 	}
+	highestModSeq := mb.Highestmodseq
+	if selected.HighestModSeq > 0 {
+		value := int64(selected.HighestModSeq)
+		highestModSeq = &value
+	}
 	if err := s.reconcileRecentFlags(ctx, client, acct, mb); err != nil {
 		s.logger.Debug("reconcile flags", "mailbox", mb.Path, "error", err)
 	}
@@ -198,7 +214,7 @@ func (s *Service) syncIMAPMailbox(ctx context.Context, client *imapclient.Client
 	uidValidity := int64(selected.UIDValidity)
 	uidNext := int64(selected.UIDNext)
 	if err := s.store.UpdateMailboxState(ctx, sqlcgen.UpdateMailboxStateParams{
-		ID: mb.ID, Uidvalidity: &uidValidity, Uidnext: &uidNext, Highestmodseq: mb.Highestmodseq,
+		ID: mb.ID, Uidvalidity: &uidValidity, Uidnext: &uidNext, Highestmodseq: highestModSeq,
 		SyncState: "idle", LastSyncedAt: &now, LastError: "",
 	}); err != nil {
 		return err
@@ -279,6 +295,28 @@ func (s *Service) reconcileRecentFlags(ctx context.Context, client *imapclient.C
 	if mb.Role == "sent" || mb.SyncMode == "pull" {
 		return nil
 	}
+	if client.SupportsCondStore() && mb.Highestmodseq != nil {
+		known, err := s.store.ListMessageUIDsByMailbox(ctx, mb.ID)
+		if err != nil {
+			return fmt.Errorf("list known uids for changed flags: %w", err)
+		}
+		uids := make([]uint32, 0, len(known))
+		for _, raw := range known {
+			if raw != nil && *raw > 0 {
+				uids = append(uids, uint32(*raw))
+			}
+		}
+		for start := 0; start < len(uids); start += 200 {
+			end := min(start+200, len(uids))
+			updates, err := client.FetchFlagsChangedSince(ctx, uids[start:end], uint64(*mb.Highestmodseq))
+			if err != nil {
+				return err
+			}
+			s.applyFlagUpdates(ctx, mb, updates)
+		}
+		return nil
+	}
+
 	uids, err := client.UIDSearchNew(ctx, 1)
 	if err != nil {
 		return err
@@ -286,13 +324,15 @@ func (s *Service) reconcileRecentFlags(ctx context.Context, client *imapclient.C
 	if len(uids) > 200 {
 		uids = uids[len(uids)-200:]
 	}
-	if len(uids) == 0 {
-		return nil
-	}
 	updates, err := client.FetchFlags(ctx, uids)
 	if err != nil {
 		return err
 	}
+	s.applyFlagUpdates(ctx, mb, updates)
+	return nil
+}
+
+func (s *Service) applyFlagUpdates(ctx context.Context, mb sqlcgen.Mailbox, updates []imapclient.FlagUpdate) {
 	for _, update := range updates {
 		found, err := s.store.FindMessageByUID(ctx, sqlcgen.FindMessageByUIDParams{MailboxID: mb.ID, Uid: ptrInt64(int64(update.UID))})
 		if err != nil {
@@ -304,7 +344,6 @@ func (s *Service) reconcileRecentFlags(ctx context.Context, client *imapclient.C
 			continue
 		}
 	}
-	return nil
 }
 
 func (s *Service) storeIMAPEnvelope(ctx context.Context, acct sqlcgen.Account, mb sqlcgen.Mailbox, env imapclient.Envelope) error {

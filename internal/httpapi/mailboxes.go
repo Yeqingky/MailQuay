@@ -1,9 +1,11 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/mailquay/mailquay/internal/httpapi/oapi"
+	"github.com/mailquay/mailquay/internal/mailbox"
 )
 
 func (s *Server) GetMailboxTree(w http.ResponseWriter, r *http.Request) {
@@ -48,6 +50,38 @@ func (s *Server) GetMailbox(w http.ResponseWriter, r *http.Request, id oapi.Mail
 		}
 		s.internal(w, r, err)
 		return
+	}
+	writeJSON(w, http.StatusOK, mapMailbox(mb))
+}
+
+func (s *Server) UpdateMailbox(w http.ResponseWriter, r *http.Request, id oapi.MailboxID) {
+	mailboxID, ok := toUUID(id)
+	if !ok {
+		s.error(w, r, http.StatusBadRequest, "invalid_id", "Invalid mailbox id.")
+		return
+	}
+	var body oapi.MailboxUpdate
+	if err := decodeJSON(r, &body); err != nil {
+		s.error(w, r, http.StatusBadRequest, "invalid_request", "Malformed request body.")
+		return
+	}
+	mb, err := s.mailboxes.SetSyncMode(r.Context(), mailboxID, string(body.SyncMode))
+	if err != nil {
+		if errors.Is(err, mailbox.ErrInvalidSyncMode) || errors.Is(err, mailbox.ErrLocalMailboxSync) {
+			s.error(w, r, http.StatusBadRequest, "invalid_request", err.Error())
+			return
+		}
+		if mapAccountError(err, w, r, s) {
+			return
+		}
+		s.internal(w, r, err)
+		return
+	}
+	if body.SyncMode != "off" {
+		if err := s.sync.TriggerMailbox(r.Context(), mailboxID); err != nil {
+			s.internal(w, r, err)
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, mapMailbox(mb))
 }

@@ -226,6 +226,13 @@ const (
 	MailboxSyncStateSyncing MailboxSyncState = "syncing"
 )
 
+// Defines values for MailboxUpdateSyncMode.
+const (
+	MailboxUpdateSyncModeFull MailboxUpdateSyncMode = "full"
+	MailboxUpdateSyncModeOff  MailboxUpdateSyncMode = "off"
+	MailboxUpdateSyncModePull MailboxUpdateSyncMode = "pull"
+)
+
 // Defines values for OutboxItemStatus.
 const (
 	OutboxItemStatusCancelled  OutboxItemStatus = "cancelled"
@@ -333,8 +340,8 @@ const (
 
 // Defines values for SettingsUpdateSentSyncMode.
 const (
-	Off  SettingsUpdateSentSyncMode = "off"
-	Pull SettingsUpdateSentSyncMode = "pull"
+	SettingsUpdateSentSyncModeOff  SettingsUpdateSentSyncMode = "off"
+	SettingsUpdateSentSyncModePull SettingsUpdateSentSyncMode = "pull"
 )
 
 // Defines values for TaskStatus.
@@ -737,6 +744,12 @@ type ErrorResponse struct {
 	} `json:"error"`
 }
 
+// LogEntry defines model for LogEntry.
+type LogEntry struct {
+	Id   int64  `json:"id"`
+	Line string `json:"line"`
+}
+
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
 	Password string `json:"password"`
@@ -787,6 +800,14 @@ type MailboxTree struct {
 	Accounts []AccountMailboxes `json:"accounts"`
 	Counts   MailboxCounts      `json:"counts"`
 }
+
+// MailboxUpdate defines model for MailboxUpdate.
+type MailboxUpdate struct {
+	SyncMode MailboxUpdateSyncMode `json:"syncMode"`
+}
+
+// MailboxUpdateSyncMode defines model for MailboxUpdate.SyncMode.
+type MailboxUpdateSyncMode string
 
 // MessageBody defines model for MessageBody.
 type MessageBody struct {
@@ -920,39 +941,48 @@ type SendRequest struct {
 
 // Settings defines model for Settings.
 type Settings struct {
-	AutoLocalConcurrency          bool                            `json:"autoLocalConcurrency"`
-	BimiAvatars                   bool                            `json:"bimiAvatars"`
-	BodyPrefetchMaxBytes          int                             `json:"bodyPrefetchMaxBytes"`
-	ComposeWindowMode             SettingsComposeWindowMode       `json:"composeWindowMode"`
-	Concurrency                   ConcurrencySettings             `json:"concurrency"`
-	DefaultDownloadScope          SettingsDefaultDownloadScope    `json:"defaultDownloadScope"`
-	DefaultInitialSyncRange       SettingsDefaultInitialSyncRange `json:"defaultInitialSyncRange"`
-	DraftPullIntervalSeconds      int                             `json:"draftPullIntervalSeconds"`
-	DraftPushDelaySeconds         int                             `json:"draftPushDelaySeconds"`
-	DraftSyncMode                 SettingsDraftSyncMode           `json:"draftSyncMode"`
-	EnvelopeBatchSize             int                             `json:"envelopeBatchSize"`
-	GoogleClientId                string                          `json:"googleClientId"`
-	GoogleFaviconAvatars          bool                            `json:"googleFaviconAvatars"`
-	GoogleSecretSet               bool                            `json:"googleSecretSet"`
-	GravatarAvatars               bool                            `json:"gravatarAvatars"`
-	IndexBatchSize                int                             `json:"indexBatchSize"`
-	Language                      SettingsLanguage                `json:"language"`
-	LogLevel                      *SettingsLogLevel               `json:"logLevel,omitempty"`
-	MaxAttachmentBytes            int                             `json:"maxAttachmentBytes"`
-	MicrosoftClientId             string                          `json:"microsoftClientId"`
-	MicrosoftSecretSet            bool                            `json:"microsoftSecretSet"`
-	NetworkAvatars                bool                            `json:"networkAvatars"`
-	Pop3IntervalSeconds           int                             `json:"pop3IntervalSeconds"`
-	PrependNewMessages            bool                            `json:"prependNewMessages"`
-	PreserveMarkedOnAccountDelete bool                            `json:"preserveMarkedOnAccountDelete"`
-	RemoveReadImmediately         bool                            `json:"removeReadImmediately"`
-	Resources                     ResourceInfo                    `json:"resources"`
-	SearchConcurrency             int                             `json:"searchConcurrency"`
-	SendRetryLimit                int                             `json:"sendRetryLimit"`
-	SentSyncMode                  SettingsSentSyncMode            `json:"sentSyncMode"`
-	SessionTtlHours               int                             `json:"sessionTtlHours"`
-	SyncIntervalSeconds           int                             `json:"syncIntervalSeconds"`
-	Timezone                      string                          `json:"timezone"`
+	AutoLocalConcurrency            bool                            `json:"autoLocalConcurrency"`
+	AutoReconnect                   bool                            `json:"autoReconnect"`
+	AutoSync                        bool                            `json:"autoSync"`
+	BimiAvatars                     bool                            `json:"bimiAvatars"`
+	BodyPrefetchMaxBytes            int                             `json:"bodyPrefetchMaxBytes"`
+	ComposeWindowMode               SettingsComposeWindowMode       `json:"composeWindowMode"`
+	Concurrency                     ConcurrencySettings             `json:"concurrency"`
+	DefaultDownloadScope            SettingsDefaultDownloadScope    `json:"defaultDownloadScope"`
+	DefaultInitialSyncRange         SettingsDefaultInitialSyncRange `json:"defaultInitialSyncRange"`
+	DraftPullIntervalSeconds        int                             `json:"draftPullIntervalSeconds"`
+	DraftPushDelaySeconds           int                             `json:"draftPushDelaySeconds"`
+	DraftSyncMode                   SettingsDraftSyncMode           `json:"draftSyncMode"`
+	EnvelopeBatchSize               int                             `json:"envelopeBatchSize"`
+	GoogleClientId                  string                          `json:"googleClientId"`
+	GoogleFaviconAvatars            bool                            `json:"googleFaviconAvatars"`
+	GoogleSecretSet                 bool                            `json:"googleSecretSet"`
+	GravatarAvatars                 bool                            `json:"gravatarAvatars"`
+	ImapWorkIdleTimeoutSeconds      int                             `json:"imapWorkIdleTimeoutSeconds"`
+	IndexBatchSize                  int                             `json:"indexBatchSize"`
+	Language                        SettingsLanguage                `json:"language"`
+	LogLevel                        *SettingsLogLevel               `json:"logLevel,omitempty"`
+	MaxAttachmentBytes              int                             `json:"maxAttachmentBytes"`
+	MaxConcurrentSyncsPerServer     int                             `json:"maxConcurrentSyncsPerServer"`
+	MaxImapConnectionsPerAccount    int                             `json:"maxImapConnectionsPerAccount"`
+	MaxImapConnectionsPerServer     int                             `json:"maxImapConnectionsPerServer"`
+	MicrosoftClientId               string                          `json:"microsoftClientId"`
+	MicrosoftSecretSet              bool                            `json:"microsoftSecretSet"`
+	NetworkAvatars                  bool                            `json:"networkAvatars"`
+	OtherMailboxSyncIntervalSeconds int                             `json:"otherMailboxSyncIntervalSeconds"`
+	Pop3IntervalSeconds             int                             `json:"pop3IntervalSeconds"`
+	PrependNewMessages              bool                            `json:"prependNewMessages"`
+	PreserveMarkedOnAccountDelete   bool                            `json:"preserveMarkedOnAccountDelete"`
+	RealTimeReceive                 bool                            `json:"realTimeReceive"`
+	RemoveReadImmediately           bool                            `json:"removeReadImmediately"`
+	Resources                       ResourceInfo                    `json:"resources"`
+	SearchConcurrency               int                             `json:"searchConcurrency"`
+	SendRetryLimit                  int                             `json:"sendRetryLimit"`
+	SentSyncMode                    SettingsSentSyncMode            `json:"sentSyncMode"`
+	SessionTtlHours                 int                             `json:"sessionTtlHours"`
+	StartupSync                     bool                            `json:"startupSync"`
+	SyncIntervalSeconds             int                             `json:"syncIntervalSeconds"`
+	Timezone                        string                          `json:"timezone"`
 }
 
 // SettingsComposeWindowMode defines model for Settings.ComposeWindowMode.
@@ -978,39 +1008,48 @@ type SettingsSentSyncMode string
 
 // SettingsUpdate defines model for SettingsUpdate.
 type SettingsUpdate struct {
-	AutoLocalConcurrency          *bool                                  `json:"autoLocalConcurrency,omitempty"`
-	BimiAvatars                   *bool                                  `json:"bimiAvatars,omitempty"`
-	BodyPrefetchMaxBytes          *int                                   `json:"bodyPrefetchMaxBytes,omitempty"`
-	ComposeWindowMode             *SettingsUpdateComposeWindowMode       `json:"composeWindowMode,omitempty"`
-	DefaultDownloadScope          *SettingsUpdateDefaultDownloadScope    `json:"defaultDownloadScope,omitempty"`
-	DefaultInitialSyncRange       *SettingsUpdateDefaultInitialSyncRange `json:"defaultInitialSyncRange,omitempty"`
-	DraftPullIntervalSeconds      *int                                   `json:"draftPullIntervalSeconds,omitempty"`
-	DraftPushDelaySeconds         *int                                   `json:"draftPushDelaySeconds,omitempty"`
-	DraftSyncMode                 *SettingsUpdateDraftSyncMode           `json:"draftSyncMode,omitempty"`
-	EnvelopeBatchSize             *int                                   `json:"envelopeBatchSize,omitempty"`
-	FetchConcurrency              *int                                   `json:"fetchConcurrency,omitempty"`
-	GoogleClientId                *string                                `json:"googleClientId,omitempty"`
-	GoogleClientSecret            *string                                `json:"googleClientSecret,omitempty"`
-	GoogleFaviconAvatars          *bool                                  `json:"googleFaviconAvatars,omitempty"`
-	GravatarAvatars               *bool                                  `json:"gravatarAvatars,omitempty"`
-	IndexBatchSize                *int                                   `json:"indexBatchSize,omitempty"`
-	Language                      *SettingsUpdateLanguage                `json:"language,omitempty"`
-	LogLevel                      *SettingsUpdateLogLevel                `json:"logLevel,omitempty"`
-	MaxAttachmentBytes            *int                                   `json:"maxAttachmentBytes,omitempty"`
-	MicrosoftClientId             *string                                `json:"microsoftClientId,omitempty"`
-	MicrosoftClientSecret         *string                                `json:"microsoftClientSecret,omitempty"`
-	NetworkAvatars                *bool                                  `json:"networkAvatars,omitempty"`
-	Pop3IntervalSeconds           *int                                   `json:"pop3IntervalSeconds,omitempty"`
-	PrependNewMessages            *bool                                  `json:"prependNewMessages,omitempty"`
-	PreserveMarkedOnAccountDelete *bool                                  `json:"preserveMarkedOnAccountDelete,omitempty"`
-	RemoveReadImmediately         *bool                                  `json:"removeReadImmediately,omitempty"`
-	SearchConcurrency             *int                                   `json:"searchConcurrency,omitempty"`
-	SendRetryLimit                *int                                   `json:"sendRetryLimit,omitempty"`
-	SentSyncMode                  *SettingsUpdateSentSyncMode            `json:"sentSyncMode,omitempty"`
-	SessionTtlHours               *int                                   `json:"sessionTtlHours,omitempty"`
-	SyncConcurrency               *int                                   `json:"syncConcurrency,omitempty"`
-	SyncIntervalSeconds           *int                                   `json:"syncIntervalSeconds,omitempty"`
-	Timezone                      *string                                `json:"timezone,omitempty"`
+	AutoLocalConcurrency            *bool                                  `json:"autoLocalConcurrency,omitempty"`
+	AutoReconnect                   *bool                                  `json:"autoReconnect,omitempty"`
+	AutoSync                        *bool                                  `json:"autoSync,omitempty"`
+	BimiAvatars                     *bool                                  `json:"bimiAvatars,omitempty"`
+	BodyPrefetchMaxBytes            *int                                   `json:"bodyPrefetchMaxBytes,omitempty"`
+	ComposeWindowMode               *SettingsUpdateComposeWindowMode       `json:"composeWindowMode,omitempty"`
+	DefaultDownloadScope            *SettingsUpdateDefaultDownloadScope    `json:"defaultDownloadScope,omitempty"`
+	DefaultInitialSyncRange         *SettingsUpdateDefaultInitialSyncRange `json:"defaultInitialSyncRange,omitempty"`
+	DraftPullIntervalSeconds        *int                                   `json:"draftPullIntervalSeconds,omitempty"`
+	DraftPushDelaySeconds           *int                                   `json:"draftPushDelaySeconds,omitempty"`
+	DraftSyncMode                   *SettingsUpdateDraftSyncMode           `json:"draftSyncMode,omitempty"`
+	EnvelopeBatchSize               *int                                   `json:"envelopeBatchSize,omitempty"`
+	FetchConcurrency                *int                                   `json:"fetchConcurrency,omitempty"`
+	GoogleClientId                  *string                                `json:"googleClientId,omitempty"`
+	GoogleClientSecret              *string                                `json:"googleClientSecret,omitempty"`
+	GoogleFaviconAvatars            *bool                                  `json:"googleFaviconAvatars,omitempty"`
+	GravatarAvatars                 *bool                                  `json:"gravatarAvatars,omitempty"`
+	ImapWorkIdleTimeoutSeconds      *int                                   `json:"imapWorkIdleTimeoutSeconds,omitempty"`
+	IndexBatchSize                  *int                                   `json:"indexBatchSize,omitempty"`
+	Language                        *SettingsUpdateLanguage                `json:"language,omitempty"`
+	LogLevel                        *SettingsUpdateLogLevel                `json:"logLevel,omitempty"`
+	MaxAttachmentBytes              *int                                   `json:"maxAttachmentBytes,omitempty"`
+	MaxConcurrentSyncsPerServer     *int                                   `json:"maxConcurrentSyncsPerServer,omitempty"`
+	MaxImapConnectionsPerAccount    *int                                   `json:"maxImapConnectionsPerAccount,omitempty"`
+	MaxImapConnectionsPerServer     *int                                   `json:"maxImapConnectionsPerServer,omitempty"`
+	MicrosoftClientId               *string                                `json:"microsoftClientId,omitempty"`
+	MicrosoftClientSecret           *string                                `json:"microsoftClientSecret,omitempty"`
+	NetworkAvatars                  *bool                                  `json:"networkAvatars,omitempty"`
+	OtherMailboxSyncIntervalSeconds *int                                   `json:"otherMailboxSyncIntervalSeconds,omitempty"`
+	Pop3IntervalSeconds             *int                                   `json:"pop3IntervalSeconds,omitempty"`
+	PrependNewMessages              *bool                                  `json:"prependNewMessages,omitempty"`
+	PreserveMarkedOnAccountDelete   *bool                                  `json:"preserveMarkedOnAccountDelete,omitempty"`
+	RealTimeReceive                 *bool                                  `json:"realTimeReceive,omitempty"`
+	RemoveReadImmediately           *bool                                  `json:"removeReadImmediately,omitempty"`
+	SearchConcurrency               *int                                   `json:"searchConcurrency,omitempty"`
+	SendRetryLimit                  *int                                   `json:"sendRetryLimit,omitempty"`
+	SentSyncMode                    *SettingsUpdateSentSyncMode            `json:"sentSyncMode,omitempty"`
+	SessionTtlHours                 *int                                   `json:"sessionTtlHours,omitempty"`
+	StartupSync                     *bool                                  `json:"startupSync,omitempty"`
+	SyncConcurrency                 *int                                   `json:"syncConcurrency,omitempty"`
+	SyncIntervalSeconds             *int                                   `json:"syncIntervalSeconds,omitempty"`
+	Timezone                        *string                                `json:"timezone,omitempty"`
 }
 
 // SettingsUpdateComposeWindowMode defines model for SettingsUpdate.ComposeWindowMode.
@@ -1249,6 +1288,9 @@ type CreateDraftJSONRequestBody = DraftInput
 // UpdateDraftJSONRequestBody defines body for UpdateDraft for application/json ContentType.
 type UpdateDraftJSONRequestBody = DraftUpdateRequest
 
+// UpdateMailboxJSONRequestBody defines body for UpdateMailbox for application/json ContentType.
+type UpdateMailboxJSONRequestBody = MailboxUpdate
+
 // BatchMessagesJSONRequestBody defines body for BatchMessages for application/json ContentType.
 type BatchMessagesJSONRequestBody = BatchRequest
 
@@ -1363,11 +1405,20 @@ type ServerInterface interface {
 	// (GET /events)
 	StreamEvents(w http.ResponseWriter, r *http.Request, params StreamEventsParams)
 
+	// (DELETE /logs)
+	ClearLogs(w http.ResponseWriter, r *http.Request)
+
+	// (GET /logs)
+	ListLogs(w http.ResponseWriter, r *http.Request)
+
 	// (GET /mailboxes)
 	GetMailboxTree(w http.ResponseWriter, r *http.Request)
 
 	// (GET /mailboxes/{id})
 	GetMailbox(w http.ResponseWriter, r *http.Request, id MailboxID)
+
+	// (PATCH /mailboxes/{id})
+	UpdateMailbox(w http.ResponseWriter, r *http.Request, id MailboxID)
 
 	// (POST /mailboxes/{id}/sync)
 	SyncMailbox(w http.ResponseWriter, r *http.Request, id MailboxID)
@@ -1616,6 +1667,16 @@ func (_ Unimplemented) StreamEvents(w http.ResponseWriter, r *http.Request, para
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// (DELETE /logs)
+func (_ Unimplemented) ClearLogs(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /logs)
+func (_ Unimplemented) ListLogs(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (GET /mailboxes)
 func (_ Unimplemented) GetMailboxTree(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -1623,6 +1684,11 @@ func (_ Unimplemented) GetMailboxTree(w http.ResponseWriter, r *http.Request) {
 
 // (GET /mailboxes/{id})
 func (_ Unimplemented) GetMailbox(w http.ResponseWriter, r *http.Request, id MailboxID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PATCH /mailboxes/{id})
+func (_ Unimplemented) UpdateMailbox(w http.ResponseWriter, r *http.Request, id MailboxID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2508,6 +2574,34 @@ func (siw *ServerInterfaceWrapper) StreamEvents(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// ClearLogs operation middleware
+func (siw *ServerInterfaceWrapper) ClearLogs(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ClearLogs(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListLogs operation middleware
+func (siw *ServerInterfaceWrapper) ListLogs(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListLogs(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetMailboxTree operation middleware
 func (siw *ServerInterfaceWrapper) GetMailboxTree(w http.ResponseWriter, r *http.Request) {
 
@@ -2538,6 +2632,31 @@ func (siw *ServerInterfaceWrapper) GetMailbox(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMailbox(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateMailbox operation middleware
+func (siw *ServerInterfaceWrapper) UpdateMailbox(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id MailboxID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateMailbox(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3555,10 +3674,19 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/events", wrapper.StreamEvents)
 	})
 	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/logs", wrapper.ClearLogs)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/logs", wrapper.ListLogs)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/mailboxes", wrapper.GetMailboxTree)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/mailboxes/{id}", wrapper.GetMailbox)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/mailboxes/{id}", wrapper.UpdateMailbox)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/mailboxes/{id}/sync", wrapper.SyncMailbox)
