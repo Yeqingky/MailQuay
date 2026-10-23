@@ -167,7 +167,7 @@ pnpm generate:api
 - 接口类型来自生成的 `schema.d.ts`, 不手写重复类型.
 - 乐观更新必须有失败回滚和用户可见提示.
 - 更新成功写回缓存时必须合并已有详情; 已读/标记响应省略附件或返回空附件列表时保留已有非空附件; 阅读器详情无附件时从正文响应恢复内嵌图片元数据.
-- HTML 邮件必须经 DOMPurify 清洗并放入不带 `allow-scripts` 的 sandbox iframe.
+- HTML 邮件必须经 DOMPurify 清洗并放入不带 `allow-scripts` 的 sandbox iframe; 后端 CSP 的 `frame-src` 必须允许 `about:` 以加载受 sandbox 保护的 `srcdoc` 正文.
 - 默认阻止远程图片和外链样式, 链接必须带 `rel="noopener noreferrer"`; 邮件自带的内联 `<style>` 块可以保留, 但必须移除 `@import`, 远程 `url()` 和可执行 CSS.
 - 阻止远程图片时, 1x1 或 2x2 及更小的跟踪像素直接移除, 不显示占位符也不计入阻止数量.
 - 被阻止的小图标 (宽高都不超过 24px) 直接隐藏但仍计入阻止数量; 其他占位符按原始尺寸显示.

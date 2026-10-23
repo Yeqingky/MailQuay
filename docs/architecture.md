@@ -666,7 +666,7 @@ HTTP 层注意:
 - 原始 MIME 不执行, 不渲染, 只解析.
 - 正文 HTML 清洗白名单: 保留排版标签, 去掉 `script`, `iframe`, `object`, `embed`, 事件属性和 `javascript:` URL.
 - iframe 使用 `sandbox="allow-popups allow-popups-to-escape-sandbox"`, 不带 `allow-scripts`, `allow-same-origin`, `allow-forms` 和 `allow-top-navigation`; 外部链接经过重写.
-- 默认阻止远程图片和外部样式, 图片地址改写为 `data-blocked-src`, 用户放行后再写入 `src`; CSP 的 `img-src` 允许这些放行后的远程图片, 未放行时不会产生请求.
+- 默认阻止远程图片和外部样式, 图片地址改写为 `data-blocked-src`, 用户放行后再写入 `src`; CSP 的 `img-src` 允许这些放行后的远程图片, `frame-src` 包含 `about:` 以加载 sandbox `srcdoc`, 未放行时不会产生请求.
 - 跟踪像素 (宽或高不超过 2px) 在阻止状态下直接移除, 不占位也不计入阻止数量.
 - 被阻止的小图标 (宽高都不超过 24px) 直接隐藏但仍计入阻止数量; 其他被阻止图片按原始尺寸显示虚线占位框.
 - HTTPS 页面把图片的 `http://` 地址升级为 `https://`, 避免混合内容拦截; HTTP 页面保持原地址.

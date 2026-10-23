@@ -113,7 +113,8 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 		// Remote mail images are stripped by the frontend sanitizer until the
 		// user allows the sender, so img-src must permit those opt-in requests.
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http: https:; font-src 'self' data:; connect-src 'self'; frame-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'")
+		// Sandboxed mail srcdoc uses about:, which must be allowed by frame-src.
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http: https:; font-src 'self' data:; connect-src 'self'; frame-src 'self' data: blob: about:; object-src 'none'; base-uri 'self'; form-action 'self'")
 		next.ServeHTTP(w, r)
 	})
 }
