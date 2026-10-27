@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -199,11 +200,29 @@ func setupAuth(ctx context.Context, st *store.Store, settingsSvc *settings.Servi
 			return nil, err
 		}
 		token = base64.RawURLEncoding.EncodeToString(buf)
-		logger.Warn("setup token generated; open /setup and enter it", "setupToken", token)
+		path, err := writeSetupToken(cfg.DataDir, token)
+		if err != nil {
+			return nil, err
+		}
+		logger.Warn("setup token generated; open /setup and read the token file", "path", path)
 	} else if needs == 0 && token != "" {
 		logger.Warn("setup token configured; open /setup", "source", "MAILQUAY_SETUP_TOKEN")
 	}
 	return auth.NewService(st, settingsSvc, logger, token), nil
+}
+
+// writeSetupToken stores the generated one-time token under the data directory
+// so it never appears in container logs. The file is readable by the runtime
+// user only.
+func writeSetupToken(dataDir, token string) (string, error) {
+	path := filepath.Join(dataDir, "setup-token")
+	if err := os.MkdirAll(dataDir, 0o700); err != nil {
+		return "", fmt.Errorf("create data directory: %w", err)
+	}
+	if err := os.WriteFile(path, []byte(token+"\n"), 0o600); err != nil {
+		return "", fmt.Errorf("write setup token: %w", err)
+	}
+	return path, nil
 }
 
 // Run starts background workers and serves HTTP until the context is cancelled.
