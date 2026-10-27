@@ -23,6 +23,30 @@ type LogEntry struct {
 	Line string `json:"line"`
 }
 
+// ResetReason explains why a streaming reader cannot resume from its cursor.
+type ResetReason string
+
+const (
+	// ResetCleared means Clear dropped every record the reader had already seen.
+	ResetCleared ResetReason = "cleared"
+	// ResetTruncated means the reader fell behind and lost records.
+	ResetTruncated ResetReason = "truncated"
+)
+
+// LogBatch is one incremental read for a streaming reader.
+type LogBatch struct {
+	// Generation identifies the buffer contents. Clear bumps it, so a reader
+	// can tell a slow cursor from a cursor that points at cleared records.
+	Generation uint64
+	// Entries holds retained records newer than the requested cursor, or every
+	// retained record when Reset is set.
+	Entries []LogEntry
+	// Latest is the newest retained record ID, or zero when nothing is retained.
+	Latest int64
+	// Reset is set when the cursor can no longer be served.
+	Reset ResetReason
+}
+
 // LogBuffer retains a bounded, ordered window of formatted log records.
 type LogBuffer struct {
 	mu       sync.RWMutex
@@ -31,6 +55,8 @@ type LogBuffer struct {
 	start    int
 	size     int
 	nextID   int64
+	gen      uint64
+	updates  chan struct{}
 }
 
 // NewLogBuffer creates a bounded log buffer. Non-positive capacities use the
@@ -39,7 +65,13 @@ func NewLogBuffer(capacity int) *LogBuffer {
 	if capacity <= 0 {
 		capacity = defaultLogCapacity
 	}
-	return &LogBuffer{entries: make([]LogEntry, capacity), capacity: capacity, nextID: 1}
+	return &LogBuffer{
+		entries:  make([]LogEntry, capacity),
+		capacity: capacity,
+		nextID:   1,
+		gen:      1,
+		updates:  make(chan struct{}, 1),
+	}
 }
 
 // Append adds one formatted record and drops the oldest record when full.
@@ -68,6 +100,16 @@ func (b *LogBuffer) Append(line string) {
 	}
 	b.entries[index] = LogEntry{ID: b.nextID, Line: line}
 	b.nextID++
+	b.notifyLocked()
+}
+
+// notifyLocked wakes streaming readers. Signals coalesce, so a reader always
+// re-reads the buffer instead of counting notifications.
+func (b *LogBuffer) notifyLocked() {
+	select {
+	case b.updates <- struct{}{}:
+	default:
+	}
 }
 
 // Write appends one record from slog's text handler.
@@ -89,6 +131,8 @@ func (b *LogBuffer) List() []LogEntry {
 }
 
 // Clear removes retained records without resetting the monotonic entry IDs.
+// The generation changes so streaming readers replay from an empty buffer
+// instead of showing records that no longer exist.
 func (b *LogBuffer) Clear() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -98,6 +142,68 @@ func (b *LogBuffer) Clear() {
 	}
 	b.start = 0
 	b.size = 0
+	b.gen++
+	b.notifyLocked()
+}
+
+// Latest returns the newest retained record ID and the current generation.
+// The ID is zero when nothing is retained.
+func (b *LogBuffer) Latest() (int64, uint64) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	if b.size == 0 {
+		return 0, b.gen
+	}
+	return b.nextID - 1, b.gen
+}
+
+// Updates reports that retained records changed. Signals coalesce; a reader
+// must call After until it returns no entries.
+func (b *LogBuffer) Updates() <-chan struct{} {
+	return b.updates
+}
+
+// After returns retained records newer than cursor for a reader that last saw
+// generation. A zero generation adopts the current one, which is how a fresh
+// reader asks for everything that is still retained.
+func (b *LogBuffer) After(cursor int64, generation uint64) LogBatch {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	batch := LogBatch{Generation: b.gen, Latest: b.nextID - 1}
+	if b.size == 0 {
+		batch.Latest = 0
+		if generation != 0 && generation != b.gen {
+			batch.Reset = ResetCleared
+		}
+		return batch
+	}
+
+	oldest := b.nextID - int64(b.size)
+	start := 0
+	switch {
+	case generation != 0 && generation != b.gen:
+		batch.Reset = ResetCleared
+	case cursor > 0 && cursor+1 < oldest:
+		// A zero cursor means the reader has seen nothing, so replaying the
+		// retained window is complete rather than lossy.
+		batch.Reset = ResetTruncated
+	case cursor+1 > oldest:
+		start = int(cursor + 1 - oldest)
+		if start > b.size {
+			start = b.size
+		}
+	}
+
+	if start >= b.size {
+		return batch
+	}
+	batch.Entries = make([]LogEntry, 0, b.size-start)
+	for i := start; i < b.size; i++ {
+		batch.Entries = append(batch.Entries, b.entries[(b.start+i)%b.capacity])
+	}
+	return batch
 }
 
 type teeHandler struct {

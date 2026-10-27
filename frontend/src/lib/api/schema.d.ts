@@ -810,6 +810,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/logs/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Batches of runtime log records. Each frame carries a cursor id; an event named `reset` means the client must drop what it has and replay the following frame. */
+        get: operations["streamLogs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings": {
         parameters: {
             query?: never;
@@ -3011,6 +3028,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         logs: components["schemas"]["LogEntry"][];
+                        /** @description Streaming cursor for the newest record, formatted as `<generation>-<entryId>`. */
+                        cursor: string;
                     };
                 };
             };
@@ -3032,6 +3051,32 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    streamLogs: {
+        parameters: {
+            query?: {
+                /** @description Cursor used when a reconnect cannot send the Last-Event-ID header. */
+                after?: string;
+            };
+            header?: {
+                "Last-Event-ID"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Server-sent events with runtime log batches. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
             };
             401: components["responses"]["Unauthorized"];
         };

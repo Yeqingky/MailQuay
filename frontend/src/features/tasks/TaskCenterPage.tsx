@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import {
@@ -39,12 +39,16 @@ import {
   retryTask,
   taskKeys,
 } from './api';
-import type { LogEntry } from './api';
+import type { LogEntry, LogsSnapshot } from './api';
+import { useLogStream } from './useLogStream';
+import type { LogStreamBatch } from './useLogStream';
 
 const TABS = ['operations', 'errors', 'logs'] as const;
 type TaskCenterTab = (typeof TABS)[number];
 const EMPTY_TASKS: Task[] = [];
 const EMPTY_LOGS: LogEntry[] = [];
+// Matches the server-side retention window so a long-open tab cannot grow past it.
+const LOG_RETENTION = 1000;
 
 const STATUS_TONE: Record<string, string> = {
   running: '--task-sync',
@@ -254,9 +258,29 @@ export function TaskCenterPage() {
     queryKey: logKeys.list,
     queryFn: fetchLogs,
     enabled: tab === 'logs',
-    refetchInterval: tab === 'logs' ? 1500 : false,
   });
-  const logs = logsQuery.data ?? EMPTY_LOGS;
+  const logs = logsQuery.data?.logs ?? EMPTY_LOGS;
+
+  const applyLogBatch = useCallback(
+    (batch: LogStreamBatch) => {
+      queryClient.setQueryData<LogsSnapshot>(logKeys.list, (previous) => {
+        const cursor = batch.cursor || previous?.cursor || '';
+        if (batch.reset) return { logs: [], cursor };
+        const current = previous?.logs ?? EMPTY_LOGS;
+        const newest = current.length > 0 ? current[current.length - 1].id : 0;
+        const appended = batch.entries.filter((entry) => entry.id > newest);
+        if (appended.length === 0) return { logs: current, cursor };
+        return { logs: [...current, ...appended].slice(-LOG_RETENTION), cursor };
+      });
+    },
+    [queryClient],
+  );
+
+  const logStream = useLogStream({
+    enabled: tab === 'logs' && logsQuery.data !== undefined,
+    cursor: logsQuery.data?.cursor,
+    onBatch: applyLogBatch,
+  });
   useEffect(() => {
     if (logs.length === 0) {
       setSelectedLogId(null);
@@ -279,7 +303,10 @@ export function TaskCenterPage() {
   const clearMutation = useMutation({
     mutationFn: clearLogs,
     onSuccess: () => {
-      queryClient.setQueryData(logKeys.list, []);
+      queryClient.setQueryData<LogsSnapshot>(logKeys.list, (previous) => ({
+        logs: [],
+        cursor: previous?.cursor ?? '',
+      }));
       toast(t('tasks.logsCleared'));
     },
     onError: (error) =>
@@ -408,6 +435,14 @@ export function TaskCenterPage() {
 
       {tab === 'logs' ? (
         <footer className="flex h-14 shrink-0 items-center justify-end gap-2 border-t bg-background px-2">
+          {logStream.status === 'failed' ? (
+            <div role="status" className="mr-auto flex items-center gap-2 text-xs text-destructive">
+              {t('tasks.logStreamFailed')}
+              <Button type="button" size="sm" variant="ghost" onClick={logStream.retry}>
+                {t('tasks.logStreamRetry')}
+              </Button>
+            </div>
+          ) : null}
           <Button type="button" size="sm" variant="secondary" onClick={() => void copyLogs()} disabled={logs.length === 0}>
             <ClipboardCopy className="size-4" aria-hidden="true" />
             {t('tasks.copyLogs')}

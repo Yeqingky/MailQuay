@@ -398,6 +398,8 @@ const zhCN = {
     clearLogsFailed: '无法清除日志.',
     copyLogs: '复制日志',
     clearLogs: '清除日志',
+    logStreamFailed: '日志实时更新已停止.',
+    logStreamRetry: '重新连接',
     type: {
       initial_sync: '初次同步',
       mailbox_sync: '文件夹同步',

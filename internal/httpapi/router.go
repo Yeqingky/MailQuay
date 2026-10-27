@@ -114,11 +114,18 @@ func loggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 			start := time.Now()
 			sw := &statusWriter{ResponseWriter: w, status: 200}
 			next.ServeHTTP(sw, r)
-			if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/v1/logs" {
+			if strings.HasPrefix(r.URL.Path, "/api/") && !isLogPath(r.URL.Path) {
 				logger.Info("http", "method", r.Method, "path", r.URL.Path, "status", sw.status, "duration", time.Since(start))
 			}
 		})
 	}
+}
+
+// isLogPath reports whether the request belongs to the log endpoints. Logging
+// them would append a record for every poll and stream reconnect, and the
+// stream connection would only be recorded when it closes.
+func isLogPath(path string) bool {
+	return path == "/api/v1/logs" || path == "/api/v1/logs/stream"
 }
 
 // noStore keeps API responses out of browser history caches and shared proxies.

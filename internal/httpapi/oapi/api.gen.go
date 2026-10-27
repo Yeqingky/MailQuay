@@ -1208,6 +1208,13 @@ type StreamEventsParams struct {
 	LastEventID *string `json:"Last-Event-ID,omitempty"`
 }
 
+// StreamLogsParams defines parameters for StreamLogs.
+type StreamLogsParams struct {
+	// After Cursor used when a reconnect cannot send the Last-Event-ID header.
+	After       *string `form:"after,omitempty" json:"after,omitempty"`
+	LastEventID *string `json:"Last-Event-ID,omitempty"`
+}
+
 // ListMessagesParams defines parameters for ListMessages.
 type ListMessagesParams struct {
 	View      *ListMessagesParamsView `form:"view,omitempty" json:"view,omitempty"`
@@ -1412,6 +1419,9 @@ type ServerInterface interface {
 
 	// (GET /logs)
 	ListLogs(w http.ResponseWriter, r *http.Request)
+
+	// (GET /logs/stream)
+	StreamLogs(w http.ResponseWriter, r *http.Request, params StreamLogsParams)
 
 	// (GET /mailboxes)
 	GetMailboxTree(w http.ResponseWriter, r *http.Request)
@@ -1676,6 +1686,11 @@ func (_ Unimplemented) ClearLogs(w http.ResponseWriter, r *http.Request) {
 
 // (GET /logs)
 func (_ Unimplemented) ListLogs(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /logs/stream)
+func (_ Unimplemented) StreamLogs(w http.ResponseWriter, r *http.Request, params StreamLogsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2595,6 +2610,54 @@ func (siw *ServerInterfaceWrapper) ListLogs(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListLogs(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StreamLogs operation middleware
+func (siw *ServerInterfaceWrapper) StreamLogs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params StreamLogsParams
+
+	// ------------- Optional query parameter "after" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "after", r.URL.Query(), &params.After)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "after", Err: err})
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Last-Event-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Last-Event-ID")]; found {
+		var LastEventID string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Last-Event-ID", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Last-Event-ID", valueList[0], &LastEventID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Last-Event-ID", Err: err})
+			return
+		}
+
+		params.LastEventID = &LastEventID
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StreamLogs(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3680,6 +3743,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/logs", wrapper.ListLogs)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/logs/stream", wrapper.StreamLogs)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/mailboxes", wrapper.GetMailboxTree)

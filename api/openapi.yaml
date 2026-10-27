@@ -986,13 +986,36 @@ paths:
                   logs:
                     type: array
                     items: { $ref: '#/components/schemas/LogEntry' }
-                required: [logs]
+                  cursor:
+                    type: string
+                    description: Streaming cursor for the newest record, formatted as `<generation>-<entryId>`.
+                required: [logs, cursor]
         '401': { $ref: '#/components/responses/Unauthorized' }
     delete:
       operationId: clearLogs
       tags: [logs]
       responses:
         '204': { description: Runtime log history cleared. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /logs/stream:
+    get:
+      operationId: streamLogs
+      tags: [logs]
+      description: Batches of runtime log records. Each frame carries a cursor id; an event named `reset` means the client must drop what it has and replay the following frame.
+      parameters:
+        - name: Last-Event-ID
+          in: header
+          schema: { type: string }
+        - name: after
+          in: query
+          description: Cursor used when a reconnect cannot send the Last-Event-ID header.
+          schema: { type: string }
+      responses:
+        '200':
+          description: Server-sent events with runtime log batches.
+          content:
+            text/event-stream:
+              schema: { type: string }
         '401': { $ref: '#/components/responses/Unauthorized' }
   /settings:
     get:

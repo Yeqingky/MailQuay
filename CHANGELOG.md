@@ -1,5 +1,14 @@
 # Changelog
 
+## 未发布
+
+### 变更
+
+- 运行日志改为 SSE 推送: 新增 `GET /logs/stream`, 按 `<generation>-<entryId>` 游标增量发送日志批次, 重连用 `Last-Event-ID` 或 `after` 补发, 缓冲区清空或游标被覆盖时先发 `reset` 事件再重放保留窗口.
+- `GET /logs` 返回值增加 `cursor`, 作为日志流的起始游标.
+- 任务中心日志标签不再每 1.5 秒轮询, 改为打开时取一次快照并保持日志流; 连续失败 3 次后显示重连提示.
+- `/api/v1/logs/stream` 与 `/api/v1/logs` 一样不记录请求日志.
+
 ## v0.1.1 - 2026-10-28
 
 ### 变更

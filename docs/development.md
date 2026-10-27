@@ -247,7 +247,7 @@ MAILQUAY_TEST_DATABASE_URL='postgres://mailquay:mailquay@127.0.0.1:5432/mailquay
 - 并发设置测试覆盖同步/拉取并发来自设置, 搜索/索引按 CPU 推荐, 以及 Bleve 写入始终保持单 writer.
 - 出站限速测试覆盖同主机建连间隔, 不同主机互不阻塞, 上下文取消, 以及交互请求插队和临时连接回退.
 - 同步任务测试覆盖单个文件夹失败后任务标记为失败, 不残留 running, 以及重试复用同一条 failed 记录.
-- 运行日志测试覆盖结构化记录捕获, 缓冲区保留上限和清空, 以及 `GET /logs` 和 `DELETE /logs` 的响应.
+- 运行日志测试覆盖结构化记录捕获, 缓冲区保留上限和清空, `GET /logs` 和 `DELETE /logs` 的响应, 以及日志流的增量批次, `Last-Event-ID` 续传, 清空后的 `reset` 事件.
 
 ### 8.2 前端
 

@@ -37,7 +37,7 @@ MailQuay is not a mail server. It does not run an MTA, does not own a domain, an
 - Two backend builds: `mailquay` with embedded frontend assets, and `mailquay-core` as API-only.
 - Centered settings dialog over the mail shell with dedicated navigation, account settings, sync, and appearance.
 - OAuth2 (XOAUTH2) for providers that require it, plus app passwords for generic IMAP or POP3 servers.
-- Server-sent events for new mail, flag changes, task progress, and outbox state.
+- Server-sent events for new mail, flag changes, task progress, outbox state, and the runtime log console.
 - A top-right task ring shows running, queued, and failed work with per-task colors and a hover panel; failures stay red until handled.
 - Embedded full-text search with Bleve, including a CJK analyzer and IMAP server-side search as a fallback.
 - Sandboxed HTML rendering, remote images blocked by default, and attachment download hardening.

@@ -3,10 +3,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchMailboxTree } from '@/features/mailboxes/api';
 import { clearLogs, dismissTask, fetchLogs, fetchTasks, retryTask } from './api';
-import type { LogEntry, Task } from './api';
+import type { LogEntry, LogsSnapshot, Task } from './api';
 import { TaskCenterPage } from './TaskCenterPage';
 
 vi.mock('@/features/mailboxes/api', () => ({ fetchMailboxTree: vi.fn() }));
@@ -25,6 +25,46 @@ vi.mock('./api', async (importOriginal) => {
     retryTask: vi.fn(),
   };
 });
+
+class MockEventSource {
+  static instances: MockEventSource[] = [];
+  url: string;
+  onopen: (() => void) | null = null;
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: (() => void) | null = null;
+  closed = false;
+  private listeners = new Map<string, (event: MessageEvent) => void>();
+
+  constructor(url: string) {
+    this.url = url;
+    MockEventSource.instances.push(this);
+  }
+
+  addEventListener(name: string, handler: (event: MessageEvent) => void) {
+    this.listeners.set(name, handler);
+  }
+
+  removeEventListener() {}
+
+  close() {
+    this.closed = true;
+  }
+
+  emit(event: string | null, payload: unknown, id: string) {
+    const message = { data: JSON.stringify(payload), lastEventId: id } as MessageEvent;
+    if (event === null) {
+      this.onmessage?.(message);
+      return;
+    }
+    this.listeners.get(event)?.(message);
+  }
+}
+
+function lastStream(): MockEventSource {
+  const source = MockEventSource.instances.at(-1);
+  if (!source) throw new Error('no log stream opened');
+  return source;
+}
 
 function Location() {
   const location = useLocation();
@@ -54,6 +94,8 @@ function makeTask(overrides: Partial<Task> & Pick<Task, 'id' | 'type' | 'status'
 }
 
 beforeEach(() => {
+  MockEventSource.instances = [];
+  vi.stubGlobal('EventSource', MockEventSource);
   vi.mocked(fetchMailboxTree).mockReset();
   vi.mocked(fetchTasks).mockReset();
   vi.mocked(fetchLogs).mockReset();
@@ -61,7 +103,11 @@ beforeEach(() => {
   vi.mocked(dismissTask).mockReset().mockResolvedValue(undefined);
   vi.mocked(retryTask).mockReset().mockResolvedValue(undefined);
   vi.mocked(fetchTasks).mockResolvedValue([]);
-  vi.mocked(fetchLogs).mockResolvedValue([]);
+  vi.mocked(fetchLogs).mockResolvedValue({ logs: [], cursor: '1-0' });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe('TaskCenterPage', () => {
@@ -71,7 +117,7 @@ describe('TaskCenterPage', () => {
       { id: 10, line: 'time=2026-10-23T09:35:14Z level=INFO msg=sync INBOX' },
       { id: 11, line: 'time=2026-10-23T09:35:15Z level=INFO msg=sync Archive' },
     ];
-    vi.mocked(fetchLogs).mockResolvedValue(logs);
+    vi.mocked(fetchLogs).mockResolvedValue({ logs, cursor: '1-11' } satisfies LogsSnapshot);
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
 
@@ -96,6 +142,35 @@ describe('TaskCenterPage', () => {
 
     await user.keyboard('{Escape}');
     expect(screen.getByTestId('location')).toHaveTextContent('/');
+  });
+
+  it('appends streamed records and replays after a reset', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchLogs).mockResolvedValue({
+      logs: [
+        { id: 10, line: 'time=2026-10-23T09:35:14Z level=INFO msg=sync INBOX' },
+        { id: 11, line: 'time=2026-10-23T09:35:15Z level=INFO msg=sync Archive' },
+      ],
+      cursor: '1-11',
+    });
+
+    renderTaskCenter();
+    await user.click(screen.getByRole('tab', { name: 'Logs' }));
+    expect(await screen.findByText(/msg=sync INBOX/)).toBeInTheDocument();
+
+    await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
+    expect(lastStream().url).toContain('/logs/stream?after=1-11');
+    lastStream().onopen?.();
+
+    lastStream().emit(null, [{ id: 12, line: 'time=2026-10-23T09:35:16Z level=WARN msg=retry' }], '1-12');
+    expect(await screen.findByText(/msg=retry/)).toBeInTheDocument();
+
+    lastStream().emit('reset', { reason: 'cleared' }, '2-0');
+    await waitFor(() => expect(screen.getByText('No logs.')).toBeInTheDocument());
+
+    lastStream().emit(null, [{ id: 13, line: 'time=2026-10-23T09:35:17Z level=INFO msg=after clear' }], '2-13');
+    expect(await screen.findByText(/msg=after clear/)).toBeInTheDocument();
+    expect(screen.queryByText(/msg=sync INBOX/)).not.toBeInTheDocument();
   });
 
   it('shows failed task details and retains retry and dismiss actions', async () => {

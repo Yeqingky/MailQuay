@@ -4,6 +4,13 @@ import type { Schemas } from '@/lib/api/client';
 export type Task = Schemas['Task'];
 export type LogEntry = Schemas['LogEntry'];
 
+// LogsSnapshot pairs the retained records with the streaming cursor that
+// resumes right after the newest one.
+export interface LogsSnapshot {
+  logs: LogEntry[];
+  cursor: string;
+}
+
 export const taskKeys = {
   all: ['tasks'] as const,
   list: ['tasks', 'list'] as const,
@@ -18,9 +25,9 @@ export async function fetchTasks(): Promise<Task[]> {
   return data.tasks;
 }
 
-export async function fetchLogs(): Promise<LogEntry[]> {
+export async function fetchLogs(): Promise<LogsSnapshot> {
   const data = unwrap(await api.GET('/logs'));
-  return data.logs;
+  return { logs: data.logs, cursor: data.cursor };
 }
 
 export async function clearLogs(): Promise<void> {

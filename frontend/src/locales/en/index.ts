@@ -399,6 +399,8 @@ const en = {
     clearLogsFailed: 'Could not clear logs.',
     copyLogs: 'Copy logs',
     clearLogs: 'Clear logs',
+    logStreamFailed: 'Live log updates stopped.',
+    logStreamRetry: 'Reconnect',
     type: {
       initial_sync: 'Initial sync',
       mailbox_sync: 'Mailbox sync',
