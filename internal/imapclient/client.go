@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/emersion/go-imap/v2"
@@ -37,7 +38,52 @@ const (
 
 	defaultTimeout = 30 * time.Second
 	maxUint32      = ^uint32(0)
+
+	// maxResponseBytes bounds a single metadata command response so a hostile
+	// server cannot exhaust memory with an oversized literal.
+	maxResponseBytes = 64 << 20
+	// maxHeaderBytes bounds a header fetch.
+	maxHeaderBytes = 8 << 20
+	// maxMessageBytes bounds a full message fetch.
+	maxMessageBytes = 256 << 20
 )
+
+// errReadLimit means a server response exceeded the per-command byte budget.
+var errReadLimit = errors.New("imapclient: response exceeds the byte limit")
+
+// readLimiter caps how many bytes a single command may read from the
+// connection. The go-imap decoder buffers declared literals in memory, so this
+// is the only place where an oversized literal can be stopped.
+type readLimiter struct {
+	net.Conn
+	limit atomic.Int64
+}
+
+func newReadLimiter(conn net.Conn) *readLimiter {
+	l := &readLimiter{Conn: conn}
+	l.limit.Store(-1)
+	return l
+}
+
+func (l *readLimiter) set(limit int64) { l.limit.Store(limit) }
+
+func (l *readLimiter) unlimited() { l.limit.Store(-1) }
+
+func (l *readLimiter) Read(p []byte) (int, error) {
+	remaining := l.limit.Load()
+	if remaining < 0 {
+		return l.Conn.Read(p)
+	}
+	if remaining == 0 {
+		return 0, errReadLimit
+	}
+	if int64(len(p)) > remaining {
+		p = p[:remaining]
+	}
+	n, err := l.Conn.Read(p)
+	l.limit.Add(-int64(n))
+	return n, err
+}
 
 // ErrAuthentication identifies an IMAP authentication rejection.
 var ErrAuthentication = errors.New("imapclient: authentication failed")
@@ -127,6 +173,7 @@ type MailboxStatus struct {
 type Client struct {
 	c       *gimapc.Client
 	conn    net.Conn
+	limiter *readLimiter
 	timeout time.Duration
 
 	mu      sync.Mutex
@@ -242,17 +289,21 @@ func Dial(ctx context.Context, cfg Config) (*Client, error) {
 		if err != nil {
 			return nil, fmt.Errorf("imapclient: dial %s: %w", cfg.Address, err)
 		}
-		c.conn = conn
-		c.c = gimapc.New(conn, opts)
+		limited := newReadLimiter(conn)
+		c.conn = limited
+		c.limiter = limited
+		c.c = gimapc.New(limited, opts)
 	case SecuritySTARTTLS:
 		conn, err := dialer.DialContext(ctx, "tcp", cfg.Address)
 		if err != nil {
 			return nil, fmt.Errorf("imapclient: dial %s: %w", cfg.Address, err)
 		}
-		c.conn = conn
+		limited := newReadLimiter(conn)
+		c.conn = limited
+		c.limiter = limited
 		_ = conn.SetDeadline(operationDeadline(ctx, timeout))
 		stop, done := interruptOnDone(ctx, conn)
-		ic, err := gimapc.NewStartTLS(conn, opts)
+		ic, err := gimapc.NewStartTLS(limited, opts)
 		stop()
 		<-done
 		_ = conn.SetDeadline(time.Time{})
@@ -269,8 +320,10 @@ func Dial(ctx context.Context, cfg Config) (*Client, error) {
 		if err != nil {
 			return nil, fmt.Errorf("imapclient: dial %s: %w", cfg.Address, err)
 		}
-		c.conn = conn
-		c.c = gimapc.New(conn, opts)
+		limited := newReadLimiter(conn)
+		c.conn = limited
+		c.limiter = limited
+		c.c = gimapc.New(limited, opts)
 	}
 
 	if err := c.waitGreeting(ctx); err != nil {
@@ -771,9 +824,13 @@ func (c *Client) fetchSection(ctx context.Context, uid uint32, section imap.Fetc
 	if uid == 0 {
 		return nil, errors.New("imapclient: fetch: uid must be greater than zero")
 	}
+	limit := int64(maxHeaderBytes)
+	if section.Specifier == imap.PartSpecifierNone {
+		limit = maxMessageBytes
+	}
 	var out []byte
 	found := false
-	err := c.do(ctx, func() error {
+	err := c.doLimit(ctx, limit, func() error {
 		opts := &imap.FetchOptions{
 			BodySection: []*imap.FetchItemBodySection{&section},
 		}
@@ -1050,6 +1107,13 @@ func (c *Client) IdleInterruptible(ctx context.Context, timeout time.Duration, i
 }
 
 func (c *Client) do(ctx context.Context, fn func() error) error {
+	return c.doLimit(ctx, maxResponseBytes, fn)
+}
+
+// doLimit runs fn under a per-command read budget. An oversized response is a
+// fatal protocol error: the stream is desynchronized, so the connection is
+// closed instead of reused.
+func (c *Client) doLimit(ctx context.Context, limit int64, fn func() error) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -1059,6 +1123,10 @@ func (c *Client) do(ctx context.Context, fn func() error) error {
 	ctx, cancel := withTimeout(ctx, c.timeout)
 	defer cancel()
 
+	if c.limiter != nil {
+		c.limiter.set(limit)
+		defer c.limiter.unlimited()
+	}
 	stop, watchDone := interruptOnDone(ctx, c.conn)
 	err := fn()
 	stop()
@@ -1071,6 +1139,10 @@ func (c *Client) do(ctx context.Context, fn func() error) error {
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		c.disconnect()
 		return fmt.Errorf("imapclient: %w", ctxErr)
+	}
+	if errors.Is(err, errReadLimit) {
+		c.disconnect()
+		return fmt.Errorf("imapclient: %w", errReadLimit)
 	}
 	if isFatal(err) {
 		c.disconnect()

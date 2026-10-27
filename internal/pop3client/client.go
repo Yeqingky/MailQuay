@@ -33,6 +33,22 @@ const (
 	defaultTimeout = 30 * time.Second
 )
 
+const (
+	// maxLineBytes bounds one protocol line.
+	maxLineBytes = 1 << 20
+)
+
+// maxMessageBytes bounds a single multiline response body. It is a variable so
+// tests can lower it without allocating hundreds of megabytes.
+var maxMessageBytes int64 = 256 << 20
+
+var (
+	// errLineTooLong means a response line exceeded maxLineBytes.
+	errLineTooLong = errors.New("pop3client: response line exceeds the byte limit")
+	// errMessageTooLarge means a response body exceeded maxMessageBytes.
+	errMessageTooLarge = errors.New("pop3client: response exceeds the byte limit")
+)
+
 // Config describes how to connect to a POP3 server.
 type Config struct {
 	// Address is "host:port" or "[IPv6]:port". The port is mandatory.
@@ -379,18 +395,31 @@ func (c *Client) readStatusLine(label string) (string, error) {
 }
 
 func (c *Client) readRawLine() (string, error) {
-	line, err := c.r.ReadString('\n')
-	if err != nil {
+	var line []byte
+	for {
+		chunk, err := c.r.ReadSlice('\n')
+		if len(line)+len(chunk) > maxLineBytes {
+			return "", errLineTooLong
+		}
+		line = append(line, chunk...)
+		if err == nil {
+			break
+		}
+		if errors.Is(err, bufio.ErrBufferFull) {
+			continue
+		}
 		return "", err
 	}
-	line = strings.TrimSuffix(line, "\n")
-	line = strings.TrimSuffix(line, "\r")
-	return line, nil
+	line = bytes.TrimSuffix(line, []byte("\n"))
+	line = bytes.TrimSuffix(line, []byte("\r"))
+	return string(line), nil
 }
 
 // readMultilineLines reads a dot-terminated response, removing byte stuffing.
+// The accumulated size is capped so a hostile server cannot exhaust memory.
 func (c *Client) readMultilineLines() ([]string, error) {
 	var lines []string
+	var total int64
 	for {
 		line, err := c.readRawLine()
 		if err != nil {
@@ -401,6 +430,10 @@ func (c *Client) readMultilineLines() ([]string, error) {
 		}
 		if strings.HasPrefix(line, "..") {
 			line = line[1:]
+		}
+		total += int64(len(line)) + 2
+		if total > maxMessageBytes {
+			return nil, errMessageTooLarge
 		}
 		lines = append(lines, line)
 	}
@@ -472,7 +505,7 @@ func parseLISTLines(lines []string) (map[int]int64, error) {
 			return nil, fmt.Errorf("malformed LIST message number %q", fields[0])
 		}
 		size, err := strconv.ParseInt(fields[1], 10, 64)
-		if err != nil || size < 0 {
+		if err != nil || size < 0 || size > maxMessageBytes {
 			return nil, fmt.Errorf("malformed LIST size %q", fields[1])
 		}
 		out[number] = size

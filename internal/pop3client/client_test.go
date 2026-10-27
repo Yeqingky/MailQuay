@@ -1,7 +1,10 @@
 package pop3client
 
 import (
+	"bufio"
 	"context"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -137,5 +140,37 @@ func TestOperationDeadline(t *testing.T) {
 	defer cancel()
 	if got := operationDeadline(ctx, time.Hour); !got.Equal(deadline) {
 		t.Fatalf("operationDeadline() = %v, want caller deadline %v", got, deadline)
+	}
+}
+
+func TestReadRawLineRejectsOversizedLine(t *testing.T) {
+	line := strings.Repeat("a", maxLineBytes+1) + "\r\n"
+	c := &Client{r: bufio.NewReader(strings.NewReader(line))}
+	if _, err := c.readRawLine(); !errors.Is(err, errLineTooLong) {
+		t.Fatalf("readRawLine error = %v, want errLineTooLong", err)
+	}
+}
+
+func TestReadMultilineRejectsOversizedBody(t *testing.T) {
+	previous := maxMessageBytes
+	maxMessageBytes = 8
+	defer func() { maxMessageBytes = previous }()
+
+	c := &Client{r: bufio.NewReader(strings.NewReader("hello\r\nworld\r\n.\r\n"))}
+	if _, err := c.readMultilineLines(); !errors.Is(err, errMessageTooLarge) {
+		t.Fatalf("readMultilineLines error = %v, want errMessageTooLarge", err)
+	}
+}
+
+func TestParseLISTRejectsOversizedMessage(t *testing.T) {
+	if _, err := parseLISTLines([]string{"1 999999999999"}); err == nil {
+		t.Fatal("oversized LIST size accepted")
+	}
+	if _, err := parseLISTLines([]string{"1 -5"}); err == nil {
+		t.Fatal("negative LIST size accepted")
+	}
+	sizes, err := parseLISTLines([]string{"2 4096"})
+	if err != nil || sizes[2] != 4096 {
+		t.Fatalf("parseLISTLines = %v, %v", sizes, err)
 	}
 }

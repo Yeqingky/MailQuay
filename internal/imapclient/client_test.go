@@ -2,6 +2,8 @@ package imapclient
 
 import (
 	"crypto/tls"
+	"errors"
+	"net"
 	"slices"
 	"testing"
 	"time"
@@ -246,5 +248,29 @@ func TestIMAPTLSConfig(t *testing.T) {
 		if suites := imapTLSConfig(host).CipherSuites; suites != nil {
 			t.Errorf("%s: default suite list replaced with %v", host, suites)
 		}
+	}
+}
+
+func TestReadLimiterStopsOversizedResponse(t *testing.T) {
+	server, client := net.Pipe()
+	defer server.Close()
+	defer client.Close()
+	go func() {
+		_, _ = server.Write([]byte("0123456789"))
+	}()
+
+	limiter := newReadLimiter(client)
+	limiter.set(4)
+	buf := make([]byte, 16)
+	n, err := limiter.Read(buf)
+	if err != nil || n != 4 {
+		t.Fatalf("first read = %d, %v; want 4, nil", n, err)
+	}
+	if _, err := limiter.Read(buf); !errors.Is(err, errReadLimit) {
+		t.Fatalf("second read error = %v, want errReadLimit", err)
+	}
+	limiter.unlimited()
+	if _, err := limiter.Read(buf); errors.Is(err, errReadLimit) {
+		t.Fatal("byte limit still enforced after reset")
 	}
 }
