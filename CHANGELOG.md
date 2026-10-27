@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.1.1 - 2026-10-28
+
+### 变更
+
+- Compose 容器名固定: 两套文件都使用 `mailquay` (应用) 和 `mailquay-sql` (数据库); 连接串改用容器名.
+- 生产镜像标签改用 `MAILQUAY_IMAGE_TAG`, 避免与开发栈的 `MAILQUAY_VERSION` 混用.
+- 开发栈参数从 `.env` 读取, compose 用 `${VAR:-默认值}` 提供回退: `POSTGRES_USER`, `POSTGRES_PASSWORD` 和 `POSTGRES_DB` 默认都是 `mailquay`, 端口默认只绑定 `127.0.0.1:8080`, 只有 `MAILQUAY_SECRET_KEY` 必填; 连接串在 compose 内拼接.
+- PostgreSQL 密码开发默认值由 `mailquay-dev` 改为 `mailquay`; 已有开发数据库需执行 `ALTER USER mailquay WITH PASSWORD 'mailquay'`.
+- `MAILQUAY_DATABASE_URL` 不再写入 `.env`, 由 compose 用容器名和 `POSTGRES_*`, `MAILQUAY_DB_NAME` 拼接; `scripts/new-database.sh` 仍通过改写 `MAILQUAY_DB_NAME` 切换库.
+
+### 修复
+
+- 容器内运行用户由自动分配的 `100:101` 固定为 `101:101`, 与数据目录属主一致; 已有数据目录升级前执行 `chown -R 101:101 ./data`.
+
 ## v0.1.0 - 2026-10-28
 
 首个正式版本. 数据库 schema 以 `00001_init.sql` 为基线, 不包含预发布阶段的兼容迁移.

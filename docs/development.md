@@ -42,7 +42,14 @@ cp .env.example .env
 openssl rand -base64 32
 ```
 
-把输出写入 `.env` 的 `MAILQUAY_SECRET_KEY`, 确认连接串后执行:
+`.env` 只供 compose 使用, 后端进程不读取该文件; 直接运行二进制时把变量导出到当前 shell, 用上面输出的值填 `MAILQUAY_SECRET_KEY`:
+
+```sh
+export MAILQUAY_SECRET_KEY='<openssl 的输出>'
+export MAILQUAY_DATABASE_URL='postgres://mailquay:mailquay@127.0.0.1:5432/mailquay?sslmode=disable'
+```
+
+然后执行:
 
 ```sh
 go run ./cmd/mailquay migrate up
@@ -361,8 +368,9 @@ docs(architecture): clarify SSE replay window
 - 不含前端镜像: 同一镜像仓库, 标签追加 `-core`: `ghcr.io/yeqingky/mailquay:vX.Y.Z-core`, `ghcr.io/yeqingky/mailquay:latest-core`, `ghcr.io/yeqingky/mailquay:<短提交哈希>-core`.
 - 两个镜像都支持 `linux/amd64` 和 `linux/arm64` 多架构 manifest.
 - 前端不提供容器镜像. 静态构建产物部署到 Cloudflare Pages 等静态平台, 或由含前端版后端内嵌.
-- `docker-compose.yml`: 使用 `ghcr.io/yeqingky/mailquay` 发布镜像, 前后端同端口提供; 状态目录使用仓库内挂载 `./data` (uid 100) 和 `./pg_data` (uid 70, 权限 750).
+- `docker-compose.yml`: 使用 `ghcr.io/yeqingky/mailquay` 发布镜像, 前后端同端口提供; 状态目录使用仓库内挂载 `./data` (uid/gid 101) 和 `./pg_data` (uid 70, 权限 750).
 - `docker-compose-dev.yml`: 本地构建 `full` 镜像, 构建时从 `./frontend` 编译前端并内嵌; 单个 `mailquay` 容器同时提供前后端, 容器内不运行 Node 进程.
+- 容器名固定: 两套 Compose 都使用 `mailquay` (应用) 和 `mailquay-sql` (数据库); 连接串由 compose 用容器名 `mailquay-sql` 拼接, 同一台机器上只能运行其中一套.
 
 本地开发栈:
 
@@ -372,10 +380,11 @@ docker compose -f docker-compose-dev.yml up -d --build
 
 - 前端和后端: `http://localhost:8080`, 同一容器提供页面和 `/api/v1`, 容器内先执行迁移再启动.
 - 前端在构建镜像时编译; 修改 `frontend` 或后端代码后重新执行带 `--build` 的启动命令.
-- 数据目录使用宿主机绑定挂载: 数据库为 `../pg_data` (uid 70, 权限 750), 运行数据为 `../data/dev` (uid 100). 首次启动前创建并 chown, 否则容器用户无法写入.
+- 数据目录使用宿主机绑定挂载: 数据库为 `../pg_data` (uid 70, 权限 750), 运行数据为 `../data/dev` (uid/gid 101). 首次启动前创建并 chown, 否则容器用户无法写入.
 - 修改前端依赖后重新构建镜像, 不需要在宿主机执行 `pnpm install`.
-- `POSTGRES_PASSWORD` 有开发默认值; `MAILQUAY_SECRET_KEY` 没有默认值, 启动前必须在 `.env` 或环境中设置为 32 字节随机值的 base64 (如 `openssl rand -base64 32`), 缺失时 Compose 直接报错.
-- 开发栈的库名由 `.env` 的 `MAILQUAY_DB_NAME` 控制, 默认 `mailquay`. 需要干净的数据库时执行 `scripts/new-database.sh [库名]`: 脚本创建新库, 应用迁移, 写入 `.env` 并重建应用容器; 旧库保留在同一个 PostgreSQL 实例中, 把 `MAILQUAY_DB_NAME` 改回去即可恢复.
+- 开发栈参数优先读取 `.env`, compose 用 `${VAR:-默认值}` 提供回退: 数据库账号, 密码和库名默认都是 `mailquay`, 端口默认绑定 `127.0.0.1:8080` (只监听本机); 只有 `MAILQUAY_SECRET_KEY` 必填, 缺失时 Compose 直接报错. `.env.example` 以生产部署为模板, 开发栈专用变量在其中以注释形式列出.
+- 数据库连接串在 compose 里用 `POSTGRES_PASSWORD` 和 `MAILQUAY_DB_NAME` 拼接, 不放进 `.env`. 修改密码后需要在 PostgreSQL 内执行 `ALTER USER mailquay WITH PASSWORD '...'`, 环境变量只影响数据库首次初始化.
+- 开发栈的库名由 `.env` 的 `MAILQUAY_DB_NAME` 控制, 默认 `mailquay`. 需要干净的数据库时执行 `scripts/new-database.sh [库名]`: 脚本创建新库, 应用迁移, 改写 `.env` 中的库名并重建应用容器; 旧库保留在同一个 PostgreSQL 实例中, 把 `MAILQUAY_DB_NAME` 改回去即可恢复.
 - Windows 和 macOS 用户使用独立二进制, 不使用容器.
 - Compose 示例固定到具体版本, 不覆盖用户已有 `.env`.
 

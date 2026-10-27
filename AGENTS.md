@@ -257,3 +257,6 @@ pnpm generate:api
 - 代码和产物文件名使用 `darwin`, 用户界面和发布说明写 `macOS`; 不手工创建 Release 绕过工作流.
 - 工作流的每个 job 必须设置 `timeout-minutes`; 联网步骤必须使用命令级 `timeout` 并最多重试 3 次; 平台构建矩阵使用 `fail-fast: false`.
 - Docker 镜像统一发布到 `ghcr.io/yeqingky/mailquay`: 含前端版使用 `vX.Y.Z`, `latest` 和 7 位短提交哈希标签; 只含后端版在标签末尾追加 `-core`.
+- 镜像内运行用户固定为 `mailquay` (`uid/gid 101`), 由 `addgroup -g 101` 和 `adduser -u 101` 显式指定, 不依赖 Alpine 的自动分配 (其 `users` 占用了 gid 100); 宿主绑定挂载的数据目录必须 `chown 101:101`.
+- Compose 容器名固定: 两套文件都使用 `mailquay` (应用) 和 `mailquay-sql` (数据库); 连接串使用容器名, 同一台机器只能运行一套.
+- 开发栈参数优先读取 `.env`, compose 用 `${VAR:-默认值}` 提供回退; `POSTGRES_USER`, `POSTGRES_PASSWORD` 和 `POSTGRES_DB` 默认都是 `mailquay`, 只有 `MAILQUAY_SECRET_KEY` 必填. `.env.example` 面向生产部署, 开发栈专用变量以注释列出; 新增参数时同步更新 `.env.example` 和 `docs/development.md`.

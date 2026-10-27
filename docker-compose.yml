@@ -1,44 +1,28 @@
-# Production stack using the published full backend image (API + embedded frontend):
-#   ghcr.io/yeqingky/mailquay
+# Image tag: MAILQUAY_IMAGE_TAG (default `latest`). / 镜像标签: MAILQUAY_IMAGE_TAG (默认 `latest`).
 #
-# Usage:
-#   POSTGRES_PASSWORD=... \
-#   MAILQUAY_SECRET_KEY=... \
-#   MAILQUAY_PUBLIC_URL=https://mail.example.com \
-#   docker compose -f docker-compose.yml up -d
+# Usage: / 用法:
+#   MAILQUAY_SECRET_KEY=... \ / MAILQUAY_SECRET_KEY 密钥
+#   MAILQUAY_PUBLIC_URL=https://mail.example.com \ / MAILQUAY_PUBLIC_URL 公开地址
+#   docker compose -f docker-compose.yml up -d / 启动: docker compose -f docker-compose.yml up -d
 #
-# Required:
-#   POSTGRES_PASSWORD
-#   MAILQUAY_SECRET_KEY   (base64 of 32 random bytes)
-#   MAILQUAY_PUBLIC_URL
+# Required: / 必填:
+#   MAILQUAY_SECRET_KEY   (base64 of 32 random bytes) / MAILQUAY_SECRET_KEY (32 字节随机值的 base64)
+#   MAILQUAY_PUBLIC_URL / MAILQUAY_PUBLIC_URL 公开地址
 #
-# State lives in host directories inside the checkout:
-#   ./pg_data   PostgreSQL data
-#   ./data      blob, body text cache, Bleve index and temp files
-# Create and chown them before the first start:
-#   sudo mkdir -p ./pg_data ./data
-#   sudo chown 70:70 ./pg_data && sudo chmod 750 ./pg_data
-#   sudo chown 100:100 ./data
+# The database user and password default to `mailquay` / `mailquay`. / 数据库账号与密码默认 `mailquay` / `mailquay`.
+#
+# State lives in host directories inside the checkout: / 状态数据保存在检出的宿主机目录中:
+#   ./pg_data   PostgreSQL data / PostgreSQL 数据
+#   ./data      blob, body text cache, Bleve index and temp files / blob, 正文文本缓存, Bleve 索引和临时文件
+# Create and chown them before the first start: / 首次启动前创建并调整属主:
+#   sudo mkdir -p ./pg_data ./data / 创建数据目录
+#   sudo chown 70:70 ./pg_data && sudo chmod 750 ./pg_data / 设置 PostgreSQL 目录属主和权限
+#   sudo chown 101:101 ./data / 设置数据目录属主
 
 services:
-  postgres:
-    image: postgres:18-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: mailquay
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
-      POSTGRES_DB: mailquay
-    volumes:
-      - ./pg_data:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mailquay -d mailquay"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    networks: [mailquay]
-
   mailquay:
-    image: ghcr.io/yeqingky/mailquay:${MAILQUAY_VERSION:-latest}
+    image: ghcr.io/yeqingky/mailquay:${MAILQUAY_IMAGE_TAG:-latest}
+    container_name: mailquay
     restart: unless-stopped
     entrypoint: ["/bin/sh", "-c"]
     command: ["/usr/local/bin/mailquay migrate up && exec /usr/local/bin/mailquay serve"]
@@ -48,7 +32,7 @@ services:
     environment:
       MAILQUAY_LISTEN_ADDR: :8080
       MAILQUAY_PUBLIC_URL: ${MAILQUAY_PUBLIC_URL:?set MAILQUAY_PUBLIC_URL}
-      MAILQUAY_DATABASE_URL: postgres://mailquay:${POSTGRES_PASSWORD}@postgres:5432/mailquay?sslmode=disable
+      MAILQUAY_DATABASE_URL: postgres://${POSTGRES_USER:-mailquay}:${POSTGRES_PASSWORD:-mailquay}@mailquay-sql:5432/${POSTGRES_DB:-mailquay}?sslmode=disable
       MAILQUAY_DATA_DIR: /data
       MAILQUAY_SECRET_KEY: ${MAILQUAY_SECRET_KEY:?set MAILQUAY_SECRET_KEY}
       MAILQUAY_TRUSTED_PROXIES: ${MAILQUAY_TRUSTED_PROXIES:-172.16.0.0/12}
@@ -56,12 +40,34 @@ services:
       - "${MAILQUAY_WEB_PORT:-8080}:8080"
     volumes:
       - ./data:/data
+      # sudo mkdir -p ./data
+      # sudo chown 101:101 ./data
     healthcheck:
       test: ["CMD", "/usr/local/bin/mailquay", "healthcheck"]
       interval: 30s
       timeout: 5s
       start_period: 20s
       retries: 5
+    networks: [mailquay]
+
+  postgres:
+    image: postgres:18-alpine
+    container_name: mailquay-sql
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mailquay}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mailquay}
+      POSTGRES_DB: ${POSTGRES_DB:-mailquay}
+    volumes:
+      - ./pg_data:/var/lib/postgresql
+      # sudo docker run --rm postgres:18-alpine id postgres
+      # sudo mkdir -p ./pg_data
+      # sudo chown 70:70 ./pg_data && sudo chmod 750 ./pg_data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mailquay} -d ${POSTGRES_DB:-mailquay}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     networks: [mailquay]
 
 networks:

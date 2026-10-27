@@ -1,40 +1,11 @@
-# Local development stack.
-#   postgres: official image, data bind-mounted to ../pg_data
-#   mailquay: Dockerfile target full - API, sync workers, SSE and the frontend
-#
-# One container serves both the API and the frontend. The frontend is compiled
-# during `docker compose build` from the in-repo ./frontend checkout, which
-# Compose passes as the `frontend` build context; no Node process runs in the
-# container. Rebuild after frontend or backend source changes.
-#
-# Usage (from the MailQuay directory):
-#   docker compose -f docker-compose-dev.yml up -d --build
-#
-# Defaults are development-only. MAILQUAY_SECRET_KEY has no default and must be
-# set (base64 of 32 random bytes, e.g. `openssl rand -base64 32`) in `.env` or the
-# environment before starting the stack.
-
+# Container names are fixed (`mailquay` for the app, `mailquay-sql` for the
+# database) so the connection string can address the database container; the
+# production stack uses the same names, so run only one stack per host.
+# 容器名固定 (应用 `mailquay`, 数据库 `mailquay-sql`), 连接串因此使用容器名;
+# 生产栈使用相同名称, 同一台机器只运行一套.
 services:
-  postgres:
-    image: postgres:18-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: mailquay
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mailquay-dev}
-      POSTGRES_DB: mailquay
-    volumes:
-      - ../pg_data:/var/lib/postgresql
-      # sudo docker run --rm postgres:18-alpine id postgres
-      # sudo mkdir -p ../pg_data
-      # sudo chown 70:70 ../pg_data && sudo chmod 750 ../pg_data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mailquay -d mailquay"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-    networks: [mailquay-dev]
-
   mailquay:
+    container_name: mailquay
     build:
       context: .
       dockerfile: Dockerfile
@@ -52,27 +23,46 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      MAILQUAY_LISTEN_ADDR: :8080
-      MAILQUAY_PUBLIC_URL: ${MAILQUAY_PUBLIC_URL:-http://localhost:${MAILQUAY_API_PORT:-8080}}
-      # scripts/new-database.sh switches this name; the previous database is kept.
-      MAILQUAY_DATABASE_URL: postgres://mailquay:${POSTGRES_PASSWORD:-mailquay-dev}@postgres:5432/${MAILQUAY_DB_NAME:-mailquay}?sslmode=disable
+      MAILQUAY_LISTEN_ADDR: ${MAILQUAY_LISTEN_ADDR:-:8080}
+      MAILQUAY_PUBLIC_URL: ${MAILQUAY_PUBLIC_URL:-http://localhost:8080}
+      MAILQUAY_DATABASE_URL: postgres://${POSTGRES_USER:-mailquay}:${POSTGRES_PASSWORD:-mailquay}@mailquay-sql:5432/${MAILQUAY_DB_NAME:-mailquay}?sslmode=disable
       MAILQUAY_DATA_DIR: /data
       MAILQUAY_SECRET_KEY: ${MAILQUAY_SECRET_KEY:?set MAILQUAY_SECRET_KEY to the base64 of 32 random bytes}
       MAILQUAY_TRUSTED_PROXIES: ${MAILQUAY_TRUSTED_PROXIES:-172.16.0.0/12}
       MAILQUAY_CORS_ORIGINS: ${MAILQUAY_CORS_ORIGINS:-}
       MAILQUAY_INSECURE_ALLOW: ${MAILQUAY_INSECURE_ALLOW:-}
     ports:
-      - "${MAILQUAY_API_PORT:-8080}:8080"
+      - "${MAILQUAY_API_PORT:-127.0.0.1:8080}:8080"
     volumes:
       - ../data/dev:/data
       # sudo mkdir -p ../data/dev
-      # sudo chown 100:100 ../data/dev
+      # sudo chown 101:101 ../data/dev
     healthcheck:
       test: ["CMD", "/usr/local/bin/mailquay", "healthcheck"]
       interval: 30s
       timeout: 5s
       start_period: 20s
       retries: 5
+    networks: [mailquay-dev]
+
+  postgres:
+    image: postgres:18-alpine
+    container_name: mailquay-sql
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mailquay}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mailquay}
+      POSTGRES_DB: ${POSTGRES_DB:-mailquay}
+    volumes:
+      - ../pg_data:/var/lib/postgresql
+      # sudo docker run --rm postgres:18-alpine id postgres
+      # sudo mkdir -p ../pg_data
+      # sudo chown 70:70 ../pg_data && sudo chmod 750 ../pg_data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mailquay} -d ${POSTGRES_DB:-mailquay}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     networks: [mailquay-dev]
 
 networks:

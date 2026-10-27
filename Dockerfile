@@ -51,7 +51,12 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -trimpat
     -o /out/mailquay ./cmd/mailquay
 
 FROM alpine:3.22 AS base
-RUN apk add --no-cache ca-certificates tzdata && addgroup -S mailquay && adduser -S -G mailquay mailquay \
+# Pin the id instead of letting BusyBox pick: Alpine already uses gid 100 for
+# `users`, which silently pushed the automatic allocation to 100:101. The id must
+# stay fixed so bind-mounted host directories keep a known owner.
+RUN apk add --no-cache ca-certificates tzdata \
+    && addgroup -g 101 -S mailquay \
+    && adduser -S -u 101 -G mailquay mailquay \
     && mkdir -p /data && chown mailquay:mailquay /data
 WORKDIR /app
 USER mailquay
