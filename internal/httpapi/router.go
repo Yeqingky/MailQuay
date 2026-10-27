@@ -26,7 +26,7 @@ const requestIDKey requestIDKeyType = 1
 // NewRouter builds the HTTP handler with middleware and static assets.
 func NewRouter(srv *Server, hub *events.Hub, logger *slog.Logger) http.Handler {
 	router := chi.NewRouter()
-	router.Use(requestIDMiddleware, recoveryMiddleware(logger), loggingMiddleware(logger), securityHeaders, corsMiddleware(srv.cfg.CORSOrigins))
+	router.Use(requestIDMiddleware, recoveryMiddleware(logger), loggingMiddleware(logger), srv.securityHeaders, corsMiddleware(srv.cfg.CORSOrigins))
 
 	router.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
@@ -130,7 +130,7 @@ func noStore(next http.Handler) http.Handler {
 	})
 }
 
-func securityHeaders(next http.Handler) http.Handler {
+func (s *Server) securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
@@ -139,7 +139,10 @@ func securityHeaders(next http.Handler) http.Handler {
 		// Remote mail images are stripped by the frontend sanitizer until the
 		// user allows the sender, so img-src must permit those opt-in requests.
 		// Sandboxed mail srcdoc uses about:, which must be allowed by frame-src.
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http: https:; font-src 'self' data:; connect-src 'self'; frame-src 'self' data: blob: about:; object-src 'none'; base-uri 'self'; form-action 'self'")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http: https:; font-src 'self' data:; connect-src 'self'; frame-src 'self' data: blob: about:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'")
+		if auth.RequestScheme(r, s.cfg.TrustedProxies) == "https" {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
+		}
 		next.ServeHTTP(w, r)
 	})
 }

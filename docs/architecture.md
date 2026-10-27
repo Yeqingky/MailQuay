@@ -648,6 +648,8 @@ HTTP 层注意:
 - 请求协议为 `https` 时不显示提醒.
 - 默认豁免: `localhost`, `.localhost`, `.local`, `.lan`, `.internal`, `.home.arpa`, `127.0.0.0/8`, `::1/128`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, `fc00::/7`, `fe80::/10`.
 - `MAILQUAY_INSECURE_ALLOW` 中的域名或 CIDR 用于额外放行内网或自建域名.
+- 请求确认为 HTTPS (含可信代理的 `X-Forwarded-Proto`) 时返回 `Strict-Transport-Security: max-age=31536000`.
+- CSP 含 `frame-ancestors 'self'`, 与 `X-Frame-Options: SAMEORIGIN` 一致, 不允许第三方页面嵌入.
 - 非 HTTPS 且不在豁免范围时, `/auth/me` 返回 `insecureTransport=true`, 前端在应用最顶部显示红色提醒条.
 - 提醒条位于内容区顶栏之上, 全宽, 不可关闭, 不可隐藏, 不写入本地设置; 只有请求命中豁免域名或 CIDR 时才不渲染.
 - 提醒条文案说明凭据和会话可能被窃听, 并提示配置 HTTPS 或设置 `MAILQUAY_INSECURE_ALLOW`.
