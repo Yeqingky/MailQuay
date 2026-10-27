@@ -32,7 +32,7 @@ func TestLoginRateLimitIgnoresSpoofedForwardedFor(t *testing.T) {
 	dataDir := filepath.Join(t.TempDir(), "data")
 	cfg := &config.Config{
 		DatabaseURL: dsn, DataDir: dataDir, SearchPath: filepath.Join(dataDir, "search"),
-		SecretKey: mustKey(t), ListenAddr: ":0", SetupToken: "setup-token",
+		SecretKey: mustKey(t), ListenAddr: ":0", SetupToken: testSetupToken,
 		TrustedProxies: []string{"127.0.0.0/8"},
 	}
 	application, err := app.New(ctx, cfg)
@@ -45,7 +45,7 @@ func TestLoginRateLimitIgnoresSpoofedForwardedFor(t *testing.T) {
 	base := server.URL + "/api/v1"
 
 	resp := postJSON(t, server.Client(), base+"/auth/setup", map[string]any{
-		"token": "setup-token", "username": "owner", "password": "supersecret1",
+		"token": testSetupToken, "username": "owner", "password": "supersecret1",
 	}, "")
 	if resp.StatusCode != 201 {
 		t.Fatalf("setup status %d", resp.StatusCode)

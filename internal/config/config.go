@@ -49,9 +49,6 @@ func Load() (*Config, error) {
 	if cfg.SecretKey == "" {
 		return nil, fmt.Errorf("MAILQUAY_SECRET_KEY is required")
 	}
-	if cfg.SetupToken != "" && len(cfg.SetupToken) < 16 {
-		return nil, fmt.Errorf("MAILQUAY_SETUP_TOKEN must be at least 16 characters")
-	}
 	if cfg.PublicURL != "" {
 		u, err := url.Parse(cfg.PublicURL)
 		if err != nil || !u.IsAbs() || u.Host == "" {

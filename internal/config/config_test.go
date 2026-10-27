@@ -39,14 +39,12 @@ func TestLoadRejectsInvalidCORSOrigin(t *testing.T) {
 	}
 }
 
-func TestLoadRejectsShortSetupToken(t *testing.T) {
+func TestLoadAcceptsAnySetupToken(t *testing.T) {
 	t.Setenv("MAILQUAY_DATABASE_URL", "postgres://mailquay:mailquay@127.0.0.1:5432/mailquay")
 	t.Setenv("MAILQUAY_SECRET_KEY", "secret")
 	t.Setenv("MAILQUAY_SETUP_TOKEN", "changeme")
-	if _, err := Load(); err == nil {
-		t.Fatal("expected short setup token to fail")
-	}
-	t.Setenv("MAILQUAY_SETUP_TOKEN", "0123456789abcdef")
+	// The length rule belongs to the uninitialized startup path, not to config
+	// loading, so an already initialized deployment can keep an old value.
 	if _, err := Load(); err != nil {
 		t.Fatalf("Load: %v", err)
 	}

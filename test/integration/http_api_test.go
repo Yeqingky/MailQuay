@@ -26,6 +26,10 @@ import (
 	"github.com/mailquay/mailquay/internal/store"
 )
 
+// testSetupToken is the configured one-time setup token for HTTP tests. It must
+// satisfy the minimum length enforced while an instance is uninitialized.
+const testSetupToken = "setup-token-0123456789"
+
 func TestHTTPAuthAndAccountFlow(t *testing.T) {
 	dsn := os.Getenv("MAILQUAY_TEST_DATABASE_URL")
 	if dsn == "" {
@@ -40,7 +44,7 @@ func TestHTTPAuthAndAccountFlow(t *testing.T) {
 	dataDir := filepath.Join(t.TempDir(), "data")
 	cfg := &config.Config{
 		DatabaseURL: dsn, DataDir: dataDir, SearchPath: filepath.Join(dataDir, "search"),
-		SecretKey: mustKey(t), ListenAddr: ":0", SetupToken: "setup-token",
+		SecretKey: mustKey(t), ListenAddr: ":0", SetupToken: testSetupToken,
 		CORSOrigins: []string{"https://app.example.com"},
 	}
 	application, err := app.New(ctx, cfg)
@@ -60,7 +64,7 @@ func TestHTTPAuthAndAccountFlow(t *testing.T) {
 	}
 	// A rejected setup must keep the token usable and name the reason.
 	weak := postJSON(t, client, base+"/auth/setup", map[string]any{
-		"token": "setup-token", "username": "owner", "password": "short",
+		"token": testSetupToken, "username": "owner", "password": "short",
 	}, "")
 	var weakBody map[string]any
 	if err := json.NewDecoder(weak.Body).Decode(&weakBody); err != nil {
@@ -75,7 +79,7 @@ func TestHTTPAuthAndAccountFlow(t *testing.T) {
 		t.Fatalf("weak password message = %q", message)
 	}
 	resp := postJSON(t, client, base+"/auth/setup", map[string]any{
-		"token": "setup-token", "username": "owner", "password": "supersecret1",
+		"token": testSetupToken, "username": "owner", "password": "supersecret1",
 	}, "")
 	if resp.StatusCode != 201 {
 		body, _ := io.ReadAll(resp.Body)
