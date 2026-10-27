@@ -213,6 +213,27 @@ func TestHTTPAuthAndAccountFlow(t *testing.T) {
 	if concurrency["searchConcurrency"] != float64(2) || concurrency["indexBatchSize"] != float64(120) {
 		t.Fatalf("manual local pools not applied: %+v", concurrency)
 	}
+	// Unknown API paths answer with a JSON error rather than plain text.
+	for _, path := range []string{"/api/v1/nope", "/api/v2/nope"} {
+		resp, err = client.Get(server.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var missing map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&missing); err != nil {
+			t.Fatalf("%s decode: %v", path, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("%s status = %d, want 404", path, resp.StatusCode)
+		}
+		if got := resp.Header.Get("Content-Type"); !strings.Contains(got, "application/json") {
+			t.Fatalf("%s content type = %q", path, got)
+		}
+		if detail, _ := missing["error"].(map[string]any); detail["code"] != "not_found" {
+			t.Fatalf("%s error = %v", path, missing["error"])
+		}
+	}
 	// JSON handlers must reject bodies without a JSON content type.
 	plainReq, err := http.NewRequest(http.MethodPatch, base+"/settings", strings.NewReader(`{"logLevel":"info"}`))
 	if err != nil {

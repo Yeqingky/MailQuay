@@ -37,14 +37,28 @@ func NewRouter(srv *Server, hub *events.Hub, logger *slog.Logger) http.Handler {
 	api.Use(srv.csrfMiddleware)
 	api.Use(srv.jsonBodyMiddleware)
 	oapi.HandlerFromMux(srv, api)
+	notFound := func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			srv.error(w, r, http.StatusNotFound, "not_found", "Not found.")
+			return
+		}
+		http.Error(w, "not found", http.StatusNotFound)
+	}
+	api.NotFound(func(w http.ResponseWriter, r *http.Request) {
+		srv.error(w, r, http.StatusNotFound, "not_found", "Not found.")
+	})
 	router.Mount("/api/v1", api)
 
 	if assets := webassets.Handler(); assets != nil {
-		router.Handle("/*", assets)
+		router.Handle("/*", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, "/api/") {
+				srv.error(w, r, http.StatusNotFound, "not_found", "Not found.")
+				return
+			}
+			assets.ServeHTTP(w, r)
+		}))
 	} else {
-		router.NotFound(func(w http.ResponseWriter, r *http.Request) {
-			http.Error(w, "not found", http.StatusNotFound)
-		})
+		router.NotFound(notFound)
 	}
 	return router
 }
