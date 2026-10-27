@@ -146,7 +146,7 @@ func (s *Service) handleSendError(ctx context.Context, outbox sqlcgen.Outbox, ac
 	}
 	delay := platform.Backoff(int(outbox.Attempts)+1, 30*time.Second, 15*time.Minute)
 	next := time.Now().UTC().Add(delay)
-	if err := s.store.RetryOutbox(ctx, sqlcgen.RetryOutboxParams{ID: outbox.ID, NextAttemptAt: next, LastError: cause.Error()}); err != nil {
+	if _, err := s.store.ScheduleOutboxRetry(ctx, sqlcgen.ScheduleOutboxRetryParams{ID: outbox.ID, NextAttemptAt: next, LastError: cause.Error()}); err != nil {
 		s.logger.Warn("schedule outbox retry", "outbox", outbox.ID, "error", err)
 	}
 	outbox.Status = "pending"

@@ -38,6 +38,9 @@ var (
 	// ErrInvalidUpload marks upload payloads rejected for size or lookup
 	// reasons. Only errors carrying it are safe to show to the client.
 	ErrInvalidUpload = errors.New("invalid upload")
+	// ErrNotRetryable means the outbox row is not in a failed state, so a
+	// retry would duplicate or resurrect a send.
+	ErrNotRetryable = errors.New("outbox is not retryable")
 )
 
 // DraftInput is the editable draft payload.
@@ -269,7 +272,9 @@ func (s *Service) ListOutbox(ctx context.Context) ([]sqlcgen.Outbox, error) {
 	return s.store.ListOutbox(ctx)
 }
 
-// Retry resets a failed outbox record.
+// Retry resets a failed outbox record. Any other state (sent, cancelled,
+// scheduled, pending, sending) is rejected, so a retry cannot duplicate a
+// delivery or fire a scheduled message early.
 func (s *Service) Retry(ctx context.Context, id uuid.UUID) error {
 	if _, err := s.store.GetOutbox(ctx, id); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -277,8 +282,13 @@ func (s *Service) Retry(ctx context.Context, id uuid.UUID) error {
 		}
 		return err
 	}
-	if err := s.store.RetryOutbox(ctx, sqlcgen.RetryOutboxParams{ID: id, NextAttemptAt: time.Now().UTC(), LastError: ""}); err != nil {
+	// The WHERE clause on status keeps the check atomic with the worker.
+	updated, err := s.store.RetryOutbox(ctx, sqlcgen.RetryOutboxParams{ID: id, NextAttemptAt: time.Now().UTC(), LastError: ""})
+	if err != nil {
 		return err
+	}
+	if updated == 0 {
+		return ErrNotRetryable
 	}
 	s.triggerWorker(id)
 	return nil

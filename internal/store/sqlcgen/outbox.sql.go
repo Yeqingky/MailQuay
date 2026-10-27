@@ -273,8 +273,9 @@ func (q *Queries) RescheduleOutbox(ctx context.Context, arg RescheduleOutboxPara
 	return i, err
 }
 
-const retryOutbox = `-- name: RetryOutbox :exec
-UPDATE outbox SET status = 'pending', next_attempt_at = $2, last_error = $3, updated_at = now() WHERE id = $1
+const retryOutbox = `-- name: RetryOutbox :execrows
+UPDATE outbox SET status = 'pending', next_attempt_at = $2, last_error = $3, updated_at = now()
+WHERE id = $1 AND status = 'failed'
 `
 
 type RetryOutboxParams struct {
@@ -283,7 +284,29 @@ type RetryOutboxParams struct {
 	LastError     string    `json:"last_error"`
 }
 
-func (q *Queries) RetryOutbox(ctx context.Context, arg RetryOutboxParams) error {
-	_, err := q.db.Exec(ctx, retryOutbox, arg.ID, arg.NextAttemptAt, arg.LastError)
-	return err
+func (q *Queries) RetryOutbox(ctx context.Context, arg RetryOutboxParams) (int64, error) {
+	result, err := q.db.Exec(ctx, retryOutbox, arg.ID, arg.NextAttemptAt, arg.LastError)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const scheduleOutboxRetry = `-- name: ScheduleOutboxRetry :execrows
+UPDATE outbox SET status = 'pending', next_attempt_at = $2, last_error = $3, updated_at = now()
+WHERE id = $1 AND status = 'sending'
+`
+
+type ScheduleOutboxRetryParams struct {
+	ID            uuid.UUID `json:"id"`
+	NextAttemptAt time.Time `json:"next_attempt_at"`
+	LastError     string    `json:"last_error"`
+}
+
+func (q *Queries) ScheduleOutboxRetry(ctx context.Context, arg ScheduleOutboxRetryParams) (int64, error) {
+	result, err := q.db.Exec(ctx, scheduleOutboxRetry, arg.ID, arg.NextAttemptAt, arg.LastError)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

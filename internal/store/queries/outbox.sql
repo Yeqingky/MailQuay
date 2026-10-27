@@ -34,8 +34,13 @@ UPDATE outbox SET status = 'copy_failed', last_error = $2, lease_until = NULL, u
 -- name: MarkOutboxFailed :exec
 UPDATE outbox SET status = 'failed', last_error = $2, lease_until = NULL, updated_at = now() WHERE id = $1;
 
--- name: RetryOutbox :exec
-UPDATE outbox SET status = 'pending', next_attempt_at = $2, last_error = $3, updated_at = now() WHERE id = $1;
+-- name: ScheduleOutboxRetry :execrows
+UPDATE outbox SET status = 'pending', next_attempt_at = $2, last_error = $3, updated_at = now()
+WHERE id = $1 AND status = 'sending';
+
+-- name: RetryOutbox :execrows
+UPDATE outbox SET status = 'pending', next_attempt_at = $2, last_error = $3, updated_at = now()
+WHERE id = $1 AND status = 'failed';
 
 -- name: CancelOutbox :exec
 UPDATE outbox SET status = 'cancelled', updated_at = now() WHERE id = $1 AND status IN ('scheduled', 'pending', 'failed');

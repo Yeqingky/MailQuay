@@ -248,7 +248,14 @@ func (s *Server) RetryOutbox(w http.ResponseWriter, r *http.Request, id openapiU
 		if mapAccountError(err, w, r, s) {
 			return
 		}
-		s.internal(w, r, err)
+		switch {
+		case errors.Is(err, compose.ErrNotFound):
+			s.error(w, r, http.StatusNotFound, "not_found", "Message not found.")
+		case errors.Is(err, compose.ErrNotRetryable):
+			s.error(w, r, http.StatusConflict, "not_retryable", "Only failed messages can be retried.")
+		default:
+			s.internal(w, r, err)
+		}
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)

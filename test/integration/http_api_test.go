@@ -346,6 +346,51 @@ func TestHTTPAuthAndAccountFlow(t *testing.T) {
 		VALUES (gen_random_uuid(), $1, '1', 'inline.png', 'image/png', 10, 'inline-cid')`, messageID); err != nil {
 		t.Fatal(err)
 	}
+	// Retry only applies to failed outbox rows; anything else must not be
+	// reset to pending and re-sent.
+	var draftID, outboxID string
+	if err := conn.QueryRow(ctx, `INSERT INTO drafts (id, account_id)
+		VALUES (gen_random_uuid(), $1) RETURNING id`, account["id"]).Scan(&draftID); err != nil {
+		t.Fatal(err)
+	}
+	for _, status := range []string{"sent", "cancelled", "scheduled"} {
+		if err := conn.QueryRow(ctx, `INSERT INTO outbox (id, account_id, draft_id, message_id_header, status)
+			VALUES (gen_random_uuid(), $1, $2, '<retry@example.com>', $3) RETURNING id`,
+			account["id"], draftID, status).Scan(&outboxID); err != nil {
+			t.Fatal(err)
+		}
+		retryResp := sendJSON(t, client, http.MethodPost, base+"/outbox/"+outboxID+"/retry", nil, csrf)
+		if retryResp.StatusCode != http.StatusConflict {
+			body, _ := io.ReadAll(retryResp.Body)
+			t.Fatalf("retry %s outbox %d: %s", status, retryResp.StatusCode, body)
+		}
+		retryResp.Body.Close()
+		var unchanged string
+		if err := conn.QueryRow(ctx, "SELECT status FROM outbox WHERE id = $1", outboxID).Scan(&unchanged); err != nil {
+			t.Fatal(err)
+		}
+		if unchanged != status {
+			t.Fatalf("retry of %s left status %q", status, unchanged)
+		}
+	}
+	if err := conn.QueryRow(ctx, `INSERT INTO outbox (id, account_id, draft_id, message_id_header, status, last_error)
+		VALUES (gen_random_uuid(), $1, $2, '<retry@example.com>', 'failed', 'smtp 550') RETURNING id`,
+		account["id"], draftID).Scan(&outboxID); err != nil {
+		t.Fatal(err)
+	}
+	retryResp := sendJSON(t, client, http.MethodPost, base+"/outbox/"+outboxID+"/retry", nil, csrf)
+	if retryResp.StatusCode != http.StatusAccepted {
+		body, _ := io.ReadAll(retryResp.Body)
+		t.Fatalf("retry failed outbox %d: %s", retryResp.StatusCode, body)
+	}
+	retryResp.Body.Close()
+	var retried string
+	if err := conn.QueryRow(ctx, "SELECT status FROM outbox WHERE id = $1", outboxID).Scan(&retried); err != nil {
+		t.Fatal(err)
+	}
+	if retried != "pending" {
+		t.Fatalf("retried outbox status = %q, want pending", retried)
+	}
 	// Batch requests are bounded and never echo internal error text.
 	tooMany := make([]string, 201)
 	for i := range tooMany {
