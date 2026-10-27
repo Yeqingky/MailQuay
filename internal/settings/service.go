@@ -297,18 +297,30 @@ func (s *Service) MaxAttachmentBytes() int64 { return s.Current().MaxAttachmentB
 // BodyPrefetchMaxBytes returns the background body prefetch limit.
 func (s *Service) BodyPrefetchMaxBytes() int64 { return s.Current().BodyPrefetchMaxBytes }
 
-// Update applies a partial settings patch.
+// Update applies a partial settings patch. Every value is decoded and validated
+// before anything is written, and the writes commit in one transaction, so a
+// rejected patch never leaves secrets or settings half applied.
 func (s *Service) Update(ctx context.Context, patch map[string]json.RawMessage) (Snapshot, error) {
 	current, err := s.Get(ctx)
 	if err != nil {
 		return Snapshot{}, err
 	}
 	next := current.Values
+	writes := make([]sqlcgen.UpsertSettingParams, 0, len(patch))
+	for key, raw := range patch {
+		if !isSecretKey(key) {
+			continue
+		}
+		encoded, err := s.encodeSecret(key, raw)
+		if err != nil {
+			return Snapshot{}, err
+		}
+		if encoded != nil {
+			writes = append(writes, sqlcgen.UpsertSettingParams{Key: canonicalKey(key), Value: encoded})
+		}
+	}
 	for key, raw := range patch {
 		if isSecretKey(key) {
-			if err := s.storeSecret(ctx, key, raw); err != nil {
-				return Snapshot{}, err
-			}
 			continue
 		}
 		if err := setField(key, raw, &next); err != nil {
@@ -330,8 +342,18 @@ func (s *Service) Update(ctx context.Context, patch map[string]json.RawMessage) 
 		if err != nil {
 			return Snapshot{}, err
 		}
-		if err := s.store.UpsertSetting(ctx, sqlcgen.UpsertSettingParams{Key: canonicalKey(key), Value: raw}); err != nil {
-			return Snapshot{}, fmt.Errorf("save setting %s: %w", key, err)
+		writes = append(writes, sqlcgen.UpsertSettingParams{Key: canonicalKey(key), Value: raw})
+	}
+	if len(writes) > 0 {
+		if err := s.store.WithTx(ctx, func(q *sqlcgen.Queries) error {
+			for _, write := range writes {
+				if err := q.UpsertSetting(ctx, write); err != nil {
+					return fmt.Errorf("save setting %s: %w", write.Key, err)
+				}
+			}
+			return nil
+		}); err != nil {
+			return Snapshot{}, err
 		}
 	}
 	return s.Get(ctx)
@@ -347,23 +369,25 @@ func (s *Service) PreserveMarked(ctx context.Context) bool {
 	return s.Current().PreserveMarked
 }
 
-func (s *Service) storeSecret(ctx context.Context, key string, raw json.RawMessage) error {
+// encodeSecret encrypts a secret patch value. An empty value keeps the stored
+// secret, so it returns nil to mean "no write".
+func (s *Service) encodeSecret(key string, raw json.RawMessage) (json.RawMessage, error) {
 	var plain string
 	if err := json.Unmarshal(raw, &plain); err != nil {
-		return fmt.Errorf("invalid secret value: %w", err)
+		return nil, fmt.Errorf("invalid secret value: %w", err)
 	}
 	if plain == "" {
-		return nil
+		return nil, nil
 	}
 	if s.cipher == nil {
-		return errors.New("no encryption key available for secrets")
+		return nil, errors.New("no encryption key available for secrets")
 	}
 	ciphertext, err := s.cipher.EncryptString(plain, secretAAD(canonicalKey(key)))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	encoded, _ := json.Marshal(base64.StdEncoding.EncodeToString(ciphertext))
-	return s.store.UpsertSetting(ctx, sqlcgen.UpsertSettingParams{Key: canonicalKey(key), Value: encoded})
+	return encoded, nil
 }
 
 // EffectiveConcurrency combines operator-set network pools with local pools.

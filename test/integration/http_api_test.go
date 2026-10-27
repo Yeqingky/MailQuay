@@ -236,6 +236,27 @@ func TestHTTPAuthAndAccountFlow(t *testing.T) {
 	if strings.Contains(stored, "google-secret") {
 		t.Fatal("OAuth secret stored in plaintext")
 	}
+	// A rejected patch must not persist any of its settings, secrets included.
+	retryBefore := settings["sendRetryLimit"]
+	resp = sendJSON(t, client, http.MethodPatch, base+"/settings", map[string]any{
+		"googleClientSecret": "rejected-secret", "sendRetryLimit": 99,
+	}, csrf)
+	if resp.StatusCode != 400 {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("invalid settings patch %d: %s", resp.StatusCode, body)
+	}
+	resp.Body.Close()
+	var after string
+	if err := conn.QueryRow(ctx, "SELECT value::text FROM settings WHERE key = 'google_client_secret'").Scan(&after); err != nil {
+		t.Fatal(err)
+	}
+	if after != stored {
+		t.Fatal("rejected patch replaced the stored OAuth secret")
+	}
+	settings = getJSON(t, client, base+"/settings")
+	if settings["sendRetryLimit"] != retryBefore {
+		t.Fatalf("rejected patch changed sendRetryLimit: %v -> %v", retryBefore, settings["sendRetryLimit"])
+	}
 	resp = sendJSON(t, client, http.MethodPost, base+"/accounts", map[string]any{
 		"name": "Test", "email": "api@example.com", "username": "api", "authType": "password",
 		"password": "secret", "receiveProtocol": "imap", "imapAddr": "127.0.0.1:143",
