@@ -537,12 +537,13 @@ func autoconfig(ctx context.Context, domain string) (endpoints, bool) {
 	return endpoints{}, false
 }
 
+// securityFromSocketType maps a provider hint to a transport. Plaintext is
+// never accepted from remote XML: a malicious autoconfig must not be able to
+// downgrade stored credentials to an unencrypted session.
 func securityFromSocketType(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "ssl", "ssl/tls", "tls":
 		return securityImplicitTLS
-	case "plain", "none":
-		return "none"
 	default:
 		return securitySTARTTLS
 	}
@@ -550,10 +551,7 @@ func securityFromSocketType(value string) string {
 
 func protocolEndpoint(host string, port int, implicitTLS bool) (Endpoint, bool) {
 	host = strings.TrimSpace(strings.ToLower(host))
-	if host == "" || port < 1 || port > 65535 {
-		return Endpoint{}, false
-	}
-	if strings.ContainsAny(host, "/ \t") {
+	if !validEndpointHost(host) || port < 1 || port > 65535 {
 		return Endpoint{}, false
 	}
 	security := securitySTARTTLS
@@ -561,6 +559,28 @@ func protocolEndpoint(host string, port int, implicitTLS bool) (Endpoint, bool) 
 		security = securityImplicitTLS
 	}
 	return Endpoint{Addr: net.JoinHostPort(host, fmt.Sprintf("%d", port)), Security: security}, true
+}
+
+// validEndpointHost accepts a DNS name or an IP literal and rejects anything
+// that could smuggle a path, credentials or extra whitespace into the address.
+func validEndpointHost(host string) bool {
+	if host == "" || len(host) > 253 {
+		return false
+	}
+	if ip, err := netip.ParseAddr(host); err == nil {
+		return ip.IsValid()
+	}
+	if strings.HasPrefix(host, ".") || strings.HasSuffix(host, ".") || strings.HasPrefix(host, "-") {
+		return false
+	}
+	for _, r := range host {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '.', r == '-', r == '_':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func httpClient() *http.Client {

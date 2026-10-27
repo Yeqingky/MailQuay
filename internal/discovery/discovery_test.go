@@ -88,3 +88,36 @@ func TestDiscoveryClientRefusesInternalHosts(t *testing.T) {
 		t.Fatal("loopback request succeeded")
 	}
 }
+
+func TestAutoconfigNeverDowngradesToPlaintext(t *testing.T) {
+	for _, hint := range []string{"plain", "none", "PLAIN", "None"} {
+		if got := securityFromSocketType(hint); got != securitySTARTTLS {
+			t.Errorf("securityFromSocketType(%q) = %q, want %q", hint, got, securitySTARTTLS)
+		}
+	}
+	if got := securityFromSocketType("ssl"); got != securityImplicitTLS {
+		t.Errorf("ssl mapped to %q", got)
+	}
+	if got := securityFromSocketType(""); got != securitySTARTTLS {
+		t.Errorf("empty socketType mapped to %q", got)
+	}
+}
+
+func TestProtocolEndpointValidatesHost(t *testing.T) {
+	bad := []string{"", "evil host", "evil\thost", "user@host", "host/path", "host:143", "[::1]", ".leading", "trailing.", "-leading"}
+	for _, host := range bad {
+		if _, ok := protocolEndpoint(host, 143, false); ok {
+			t.Errorf("protocolEndpoint(%q) accepted", host)
+		}
+	}
+	for _, host := range []string{"imap.example.com", "mail-1.example.co.uk", "127.0.0.1", "::1"} {
+		endpoint, ok := protocolEndpoint(host, 993, true)
+		if !ok {
+			t.Errorf("protocolEndpoint(%q) rejected", host)
+			continue
+		}
+		if endpoint.Security != securityImplicitTLS {
+			t.Errorf("protocolEndpoint(%q) security = %q", host, endpoint.Security)
+		}
+	}
+}
