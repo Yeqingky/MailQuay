@@ -774,6 +774,18 @@ func validate(v Values) error {
 	default:
 		return errors.New("logLevel must be debug, info, warn or error")
 	}
+	if v.DraftPullIntervalSeconds < 30 || v.DraftPullIntervalSeconds > 86400 {
+		return errors.New("draftPullIntervalSeconds must be 30-86400")
+	}
+	if v.DraftPushDelaySeconds < 0 || v.DraftPushDelaySeconds > 3600 {
+		return errors.New("draftPushDelaySeconds must be 0-3600")
+	}
+	if v.Timezone == "" {
+		return errors.New("timezone must not be empty")
+	}
+	if _, err := time.LoadLocation(v.Timezone); err != nil {
+		return errors.New("timezone must be a valid IANA name")
+	}
 	if v.SessionTTLHours < 1 || v.SessionTTLHours > 8760 {
 		return errors.New("sessionTtlHours must be 1-8760")
 	}
