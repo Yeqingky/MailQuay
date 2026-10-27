@@ -32,7 +32,7 @@ func NewRouter(srv *Server, hub *events.Hub, logger *slog.Logger) http.Handler {
 	})
 
 	api := chi.NewRouter()
-	api.Use(srv.sessionMiddleware)
+	api.Use(noStore, srv.sessionMiddleware)
 	api.Use(srv.csrfMiddleware)
 	oapi.HandlerFromMux(srv, api)
 	router.Mount("/api/v1", api)
@@ -103,6 +103,15 @@ func loggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 			}
 		})
 	}
+}
+
+// noStore keeps API responses out of browser history caches and shared proxies.
+// Handlers that serve intentionally cacheable resources set their own header.
+func noStore(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		next.ServeHTTP(w, r)
+	})
 }
 
 func securityHeaders(next http.Handler) http.Handler {

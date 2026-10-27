@@ -188,6 +188,9 @@ func TestHTTPAuthAndAccountFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if got := resp.Header.Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("api cache-control = %q, want no-store", got)
+	}
 	resp.Body.Close()
 	if csrfFromJar(t, jar, server.URL) != csrf {
 		t.Fatal("session refresh must keep the CSRF token stable for open tabs")
