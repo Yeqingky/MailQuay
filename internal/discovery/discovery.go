@@ -612,6 +612,10 @@ var blockedPrefixes = []netip.Prefix{
 	netip.MustParsePrefix("2001:db8::/32"),
 }
 
+// ErrBlockedPort is returned when autodiscovery tries to use a port other than
+// the HTTPS default.
+var ErrBlockedPort = errors.New("discovery: blocked port")
+
 // publicDialContext resolves the target and dials only a public address, so a
 // crafted autodiscovery response cannot make the server probe loopback,
 // private, link-local or metadata endpoints.
@@ -619,6 +623,11 @@ func publicDialContext(ctx context.Context, network, addr string) (net.Conn, err
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, err
+	}
+	// Autodiscovery endpoints are plain HTTPS on the default port; a redirect
+	// to another port would only widen the SSRF surface.
+	if port != "443" {
+		return nil, fmt.Errorf("%w: %s", ErrBlockedPort, port)
 	}
 	ips, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
 	if err != nil {

@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -118,6 +119,16 @@ func TestProtocolEndpointValidatesHost(t *testing.T) {
 		}
 		if endpoint.Security != securityImplicitTLS {
 			t.Errorf("protocolEndpoint(%q) security = %q", host, endpoint.Security)
+		}
+	}
+}
+
+func TestPublicDialContextRequiresHTTPSPort(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	for _, addr := range []string{"8.8.8.8:8443", "8.8.8.8:80"} {
+		if _, err := publicDialContext(ctx, "tcp", addr); !errors.Is(err, ErrBlockedPort) {
+			t.Fatalf("%s error = %v, want ErrBlockedPort", addr, err)
 		}
 	}
 }
