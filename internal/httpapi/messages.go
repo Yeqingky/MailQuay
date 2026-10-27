@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/mailquay/mailquay/internal/httpapi/oapi"
 	"github.com/mailquay/mailquay/internal/message"
@@ -269,10 +270,36 @@ func (s *Server) ArchiveMessage(w http.ResponseWriter, r *http.Request, id oapi.
 	writeJSON(w, http.StatusCreated, mapArchive(entry))
 }
 
+// maxBatchIDs caps a single batch request so one call cannot fan out into an
+// unbounded number of serial database and queue operations.
+const maxBatchIDs = 200
+
 func (s *Server) BatchMessages(w http.ResponseWriter, r *http.Request) {
 	var body oapi.BatchRequest
 	if err := decodeJSON(r, &body); err != nil {
 		s.error(w, r, http.StatusBadRequest, "invalid_request", "Malformed request body.")
+		return
+	}
+	if len(body.Ids) > maxBatchIDs {
+		s.error(w, r, http.StatusBadRequest, "batch_too_large", "At most 200 message ids are allowed per batch.")
+		return
+	}
+	var moveMailbox uuid.UUID
+	switch body.Action {
+	case "read", "unread", "mark", "unmark", "archive", "delete":
+	case "move":
+		if body.MailboxId == nil {
+			s.error(w, r, http.StatusBadRequest, "mailbox_required", "mailboxId is required for move.")
+			return
+		}
+		id, ok := toUUID(*body.MailboxId)
+		if !ok {
+			s.error(w, r, http.StatusBadRequest, "invalid_id", "Invalid mailbox id.")
+			return
+		}
+		moveMailbox = id
+	default:
+		s.error(w, r, http.StatusBadRequest, "invalid_action", "Unsupported batch action.")
 		return
 	}
 	result := oapi.BatchResult{Succeeded: []openapiUUID{}, Failed: []struct {
@@ -303,26 +330,34 @@ func (s *Server) BatchMessages(w http.ResponseWriter, r *http.Request) {
 		case "delete":
 			err = s.messages.Delete(r.Context(), id)
 		case "move":
-			if body.MailboxId == nil {
-				err = errors.New("mailboxId is required for move")
-			} else if mailboxID, ok := toUUID(*body.MailboxId); ok {
-				err = s.messages.Move(r.Context(), id, mailboxID)
-			} else {
-				err = errors.New("invalid mailbox id")
-			}
-		default:
-			err = errors.New("unsupported action")
+			err = s.messages.Move(r.Context(), id, moveMailbox)
 		}
 		if err != nil {
+			if !errors.Is(err, message.ErrNotFound) && !errors.Is(err, message.ErrNoDeleteTarget) {
+				s.logger.Debug("batch message action failed", "action", body.Action, "id", rawID, "error", err)
+			}
 			result.Failed = append(result.Failed, struct {
 				Error string      `json:"error"`
 				Id    openapiUUID `json:"id"`
-			}{Id: rawID, Error: err.Error()})
+			}{Id: rawID, Error: batchFailureReason(err)})
 			continue
 		}
 		result.Succeeded = append(result.Succeeded, rawID)
 	}
 	writeJSON(w, http.StatusOK, result)
+}
+
+// batchFailureReason maps an internal error to a stable client-facing reason
+// instead of echoing database or IMAP error text.
+func batchFailureReason(err error) string {
+	switch {
+	case errors.Is(err, message.ErrNoDeleteTarget):
+		return "delete_target_missing"
+	case errors.Is(err, message.ErrNotFound), errors.Is(err, pgx.ErrNoRows):
+		return "not_found"
+	default:
+		return "operation_failed"
+	}
 }
 
 func (s *Server) GetThread(w http.ResponseWriter, r *http.Request, id openapiUUID) {

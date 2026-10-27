@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/mailquay/mailquay/internal/app"
@@ -335,6 +336,34 @@ func TestHTTPAuthAndAccountFlow(t *testing.T) {
 	if _, err := conn.Exec(ctx, `INSERT INTO attachments (id, message_id, part_path, filename, content_type, size, content_id)
 		VALUES (gen_random_uuid(), $1, '1', 'inline.png', 'image/png', 10, 'inline-cid')`, messageID); err != nil {
 		t.Fatal(err)
+	}
+	// Batch requests are bounded and never echo internal error text.
+	tooMany := make([]string, 201)
+	for i := range tooMany {
+		tooMany[i] = uuid.NewString()
+	}
+	resp = sendJSON(t, client, http.MethodPost, base+"/messages/batch", map[string]any{
+		"action": "read", "ids": tooMany,
+	}, csrf)
+	if resp.StatusCode != http.StatusBadRequest {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("oversized batch %d: %s", resp.StatusCode, body)
+	}
+	resp.Body.Close()
+	var batch map[string]any
+	resp = sendJSON(t, client, http.MethodPost, base+"/messages/batch", map[string]any{
+		"action": "read", "ids": []string{uuid.NewString()},
+	}, csrf)
+	if err := json.NewDecoder(resp.Body).Decode(&batch); err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	failed, _ := batch["failed"].([]any)
+	if len(failed) != 1 {
+		t.Fatalf("batch failed = %v", batch["failed"])
+	}
+	if reason, _ := failed[0].(map[string]any)["error"].(string); reason != "not_found" {
+		t.Fatalf("batch failure reason = %q, want not_found", reason)
 	}
 	detail := getJSON(t, client, base+"/messages/"+messageID)
 	assertDetail := func(label string, payload map[string]any) {
