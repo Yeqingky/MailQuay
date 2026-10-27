@@ -1,12 +1,13 @@
 import '@/lib/i18n';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
+import { useMemo } from 'react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useUiStore } from '@/stores/ui';
 import { publishMailEvent } from '@/lib/events/bus';
 import type { MessageSummary } from './api';
-import { fetchMessage, fetchMessages, messageKeys } from './api';
+import { fetchMessages, messageKeys } from './api';
 import { MessagesWorkspace, type WorkspaceQuery } from './MessagesWorkspace';
 import { useMessageList } from './useMessages';
 import { useMailListPreferences } from './useMailListPreferences';
@@ -23,7 +24,7 @@ vi.mock('./useMailListPreferences', () => ({ useMailListPreferences: vi.fn() }))
 
 vi.mock('./api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./api')>();
-  return { ...actual, fetchMessage: vi.fn(), fetchMessages: vi.fn() };
+  return { ...actual, fetchMessages: vi.fn() };
 });
 
 const params = { view: 'unread' as const, limit: 50 };
@@ -42,6 +43,34 @@ function makeMessage(overrides: Partial<MessageSummary> & { id: string }): Messa
     bodyState: 'cached',
     ...overrides,
   };
+}
+
+/** Real list query so event handling can be asserted through fetchMessages. */
+function LiveList() {
+  const list = useMessageList(params, true);
+  const scope = useMemo(
+    () => ({ params, matches: (message: MessageSummary) => message.unread }),
+    [],
+  );
+  return (
+    <MessagesWorkspace
+      title="Unread"
+      messages={list.messages}
+      query={{
+        isPending: list.isPending,
+        isError: list.isError,
+        error: list.error,
+        refetch: () => void list.refetch(),
+        hasNextPage: false,
+        isFetchingNextPage: false,
+        fetchNextPage: () => undefined,
+      }}
+      showAccountBadge={false}
+      emptyTitle="No messages"
+      emptyBody="Nothing here"
+      scope={scope}
+    />
+  );
 }
 
 const queryStub: WorkspaceQuery = {
@@ -190,9 +219,6 @@ describe('MessagesWorkspace selection', () => {
   });
 
   it('queues new messages behind a notice when automatic insertion is off', async () => {
-    vi.mocked(fetchMessage).mockResolvedValue(
-      makeMessage({ id: 'm3', subject: 'Arrived' }) as never,
-    );
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     client.setQueryData(messageKeys.list(params), {
       pages: [{ messages: [] }],
@@ -205,7 +231,11 @@ describe('MessagesWorkspace selection', () => {
       client,
     });
 
-    publishMailEvent('message.new', { messageId: 'm3', accountId: 'acc-1' });
+    publishMailEvent('message.new', {
+      accountId: 'acc-1',
+      messageId: 'm3',
+      message: makeMessage({ id: 'm3', subject: 'Arrived' }),
+    });
 
     const notice = await screen.findByRole('button', { name: /1 new message/ });
     await userEvent.setup().click(notice);
@@ -226,52 +256,84 @@ describe('MessagesWorkspace selection', () => {
     });
     const existing = makeMessage({ id: 'm1' });
     vi.mocked(fetchMessages).mockResolvedValue({ messages: [existing] });
-    vi.mocked(fetchMessage).mockResolvedValue(
-      makeMessage({
-        id: 'm3',
-        from: { name: 'Carol', email: 'carol@example.com' },
-        subject: 'Newest',
-        receivedAt: '2026-10-21T10:00:00Z',
-      }) as never,
-    );
+    const arrival = makeMessage({
+      id: 'm3',
+      from: { name: 'Carol', email: 'carol@example.com' },
+      subject: 'Newest',
+      receivedAt: '2026-10-21T10:00:00Z',
+    });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-
-    function LiveUnread() {
-      const list = useMessageList(params, true);
-      return (
-        <MessagesWorkspace
-          title="Unread"
-          messages={list.messages}
-          query={{
-            isPending: list.isPending,
-            isError: list.isError,
-            error: list.error,
-            refetch: () => void list.refetch(),
-            hasNextPage: false,
-            isFetchingNextPage: false,
-            fetchNextPage: () => undefined,
-          }}
-          showAccountBadge={false}
-          emptyTitle="No messages"
-          emptyBody="Nothing here"
-          scope={{ params, matches: (message) => message.unread }}
-        />
-      );
-    }
 
     render(
       <QueryClientProvider client={client}>
-        <LiveUnread />
+        <LiveList />
       </QueryClientProvider>,
     );
 
     await screen.findByRole('button', { name: 'Open message from Alice' });
-    publishMailEvent('message.new', { messageId: 'm3', accountId: 'acc-1' });
+    const initialFetches = vi.mocked(fetchMessages).mock.calls.length;
+    publishMailEvent('message.new', {
+      accountId: 'acc-1',
+      messageId: 'm3',
+      message: arrival,
+    });
 
     await waitFor(() => {
       const buttons = screen.getAllByRole('button', { name: /Open message from/ });
       expect(buttons[0]).toHaveAccessibleName('Open message from Carol');
       expect(buttons).toHaveLength(2);
     });
+    // The summary is enough to render the row, so no detail or list request is
+    // issued for a single new message.
+    expect(vi.mocked(fetchMessages).mock.calls.length).toBe(initialFetches);
+  });
+
+  it('coalesces id-only events into a single list refresh', async () => {
+    vi.mocked(fetchMessages).mockResolvedValue({ messages: [] });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={client}>
+        <LiveList />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(fetchMessages).toHaveBeenCalledTimes(1));
+
+    for (let index = 0; index < 20; index += 1) {
+      publishMailEvent('message.new', { accountId: 'acc-1', messageId: `legacy-${index}` });
+    }
+
+    await waitFor(() => expect(fetchMessages).toHaveBeenCalledTimes(2), { timeout: 3_000 });
+    const settle = Promise.withResolvers<void>();
+    setTimeout(settle.resolve, 200);
+    await settle.promise;
+    expect(fetchMessages).toHaveBeenCalledTimes(2);
+  });
+
+  it('refreshes the list once for a burst of bulk mailbox events', async () => {
+    vi.mocked(fetchMessages).mockResolvedValue({ messages: [] });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={client}>
+        <LiveList />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(fetchMessages).toHaveBeenCalledTimes(1));
+
+    for (let index = 0; index < 30; index += 1) {
+      publishMailEvent('mailbox.updated', {
+        accountId: 'acc-1',
+        mailboxId: 'mb-1',
+        syncState: 'syncing',
+        bulk: true,
+      });
+    }
+
+    await waitFor(() => expect(fetchMessages).toHaveBeenCalledTimes(2), { timeout: 3_000 });
+    const settle = Promise.withResolvers<void>();
+    setTimeout(settle.resolve, 200);
+    await settle.promise;
+    expect(fetchMessages).toHaveBeenCalledTimes(2);
   });
 });

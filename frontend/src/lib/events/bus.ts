@@ -8,6 +8,10 @@ export interface MessageEventPayload {
   accountId?: string;
   mailboxId?: string;
   unread?: boolean;
+  /** Lightweight MessageSummary attached to message.new events. */
+  message?: unknown;
+  /** Set on mailbox.updated events emitted during a bulk import. */
+  bulk?: boolean;
 }
 
 type Listener<T> = (payload: T) => void;

@@ -9,12 +9,12 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useUiStore } from '@/stores/ui';
 import { subscribeMailEvent, type MessageEventPayload } from '@/lib/events/bus';
 import {
-  fetchMessage,
   fetchMessages,
   messageKeys,
   type ListMessagesParams,
   type MessageSummary,
 } from './api';
+import { readEventMessage } from './eventPayload';
 import {
   compareMessageOrder,
   insertMessageIntoCache,
@@ -43,7 +43,8 @@ interface Selection {
   isArchive: boolean;
 }
 
-const NEW_MESSAGE_BATCH_MS = 250;
+// One list refresh per window, regardless of how many events arrive.
+const LIST_REFRESH_MS = 1_500;
 
 function mergePending(
   previous: MessageSummary[],
@@ -170,7 +171,6 @@ export function MessagesWorkspace({
 
   useEffect(() => {
     if (!scope) return;
-    const queue = new Set<string>();
     let timer: number | undefined;
     let disposed = false;
 
@@ -178,31 +178,29 @@ export function MessagesWorkspace({
       messagesRef.current.some((message) => message.id === id) ||
       pendingRef.current.some((message) => message.id === id);
 
-    const flush = async () => {
-      timer = undefined;
-      const ids = [...queue];
-      queue.clear();
-      if (ids.length === 0) return;
-      const details = await Promise.all(
-        ids.map((id) => fetchMessage(id).catch(() => null)),
-      );
-      if (disposed) return;
-      const fresh = details.filter(
-        (message): message is MessageSummary =>
-          message !== null && scope.matches(message) && !isKnown(message.id),
-      );
-      mergeIncoming(fresh);
+    // Bulk syncs and id-only events can change many rows at once. Coalesce the
+    // list refresh into one request per window instead of fetching one message
+    // detail per event.
+    const scheduleRefresh = () => {
+      if (timer !== undefined) return;
+      timer = window.setTimeout(() => {
+        timer = undefined;
+        if (disposed) return;
+        void queryClient.invalidateQueries({ queryKey: messageKeys.list(scope.params) });
+      }, LIST_REFRESH_MS);
     };
 
-    const schedule = (id: string) => {
-      queue.add(id);
-      if (timer === undefined) {
-        timer = window.setTimeout(() => void flush(), NEW_MESSAGE_BATCH_MS);
+    const accept = (message: MessageSummary) => {
+      if (!scope.matches(message) || isKnown(message.id)) return;
+      if (prependNewMessages) {
+        if (!insertMessageIntoCache(queryClient, scope.params, message)) scheduleRefresh();
+        return;
       }
+      setPending((previous) => mergePending(previous, [message]));
     };
 
     const unsubscribeNew = subscribeMailEvent<MessageEventPayload>('message.new', (payload) => {
-      if (!payload?.messageId) return;
+      if (!payload) return;
       if (
         scope.params.accountId &&
         payload.accountId &&
@@ -210,8 +208,30 @@ export function MessagesWorkspace({
       ) {
         return;
       }
-      schedule(payload.messageId);
+      const message = readEventMessage(payload.message);
+      if (message) {
+        accept(message);
+        return;
+      }
+      scheduleRefresh();
     });
+    // A bulk import announces the mailbox, not each message; refresh the
+    // visible page at most once per interval so history appears progressively.
+    const unsubscribeMailbox = subscribeMailEvent<MessageEventPayload>(
+      'mailbox.updated',
+      (payload) => {
+        if (!payload) return;
+        if (scope.params.mailboxId && payload.mailboxId !== scope.params.mailboxId) return;
+        if (
+          scope.params.accountId &&
+          payload.accountId &&
+          payload.accountId !== scope.params.accountId
+        ) {
+          return;
+        }
+        scheduleRefresh();
+      },
+    );
     const unsubscribeRemoved = subscribeMailEvent<MessageEventPayload>(
       'message.removed',
       (payload) => {
@@ -237,10 +257,11 @@ export function MessagesWorkspace({
       disposed = true;
       if (timer !== undefined) window.clearTimeout(timer);
       unsubscribeNew();
+      unsubscribeMailbox();
       unsubscribeRemoved();
       unsubscribeReconnect();
     };
-  }, [mergeIncoming, scope]);
+  }, [mergeIncoming, prependNewMessages, queryClient, scope]);
 
   const showPending = () => {
     if (!scope) return;

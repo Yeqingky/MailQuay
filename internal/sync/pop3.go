@@ -76,6 +76,14 @@ func (s *Service) syncPOP3(ctx context.Context, acct sqlcgen.Account, creds acco
 	} else {
 		taskStarted = true
 	}
+	// A first POP3 poll imports the whole mailbox; coalesce those notifications
+	// like the IMAP bulk path does.
+	bulk := newBulkEvents(len(infos)-len(known) > bulkEventThreshold)
+	defer func() {
+		if bulk.pending() {
+			s.hub.Publish("mailbox.updated", mailboxProgressEvent(inbox, acct))
+		}
+	}()
 	seen := make(map[string]struct{}, len(infos))
 	processed := int32(0)
 	for _, info := range infos {
@@ -90,7 +98,7 @@ func (s *Service) syncPOP3(ctx context.Context, acct sqlcgen.Account, creds acco
 			s.updateTask(ctx, "mailbox_sync", &acct.ID, processed, int32(len(infos)), "polling POP3")
 			continue
 		}
-		if err := s.importPOP3Message(ctx, client, acct, inbox, info); err != nil {
+		if err := s.importPOP3Message(ctx, client, acct, inbox, info, bulk); err != nil {
 			s.logger.Warn("import pop3 message", "uidl", info.UIDL, "error", err)
 		}
 		processed++
@@ -122,11 +130,12 @@ func (s *Service) syncPOP3(ctx context.Context, acct sqlcgen.Account, creds acco
 	s.hub.Publish("mailbox.updated", map[string]any{
 		"mailboxId": inbox.ID.String(), "unread": refreshed.Unread, "total": refreshed.Total, "syncState": "idle",
 	})
+	bulk.clear()
 	s.completeTask(ctx, "mailbox_sync", &acct.ID)
 	return nil
 }
 
-func (s *Service) importPOP3Message(ctx context.Context, client *pop3client.Client, acct sqlcgen.Account, mb sqlcgen.Mailbox, info pop3client.MessageInfo) error {
+func (s *Service) importPOP3Message(ctx context.Context, client *pop3client.Client, acct sqlcgen.Account, mb sqlcgen.Mailbox, info pop3client.MessageInfo, bulk *bulkEvents) error {
 	var raw []byte
 	var err error
 	if acct.DownloadScope == "headers" {
@@ -213,10 +222,11 @@ func (s *Service) importPOP3Message(ctx context.Context, client *pop3client.Clie
 	if err != nil {
 		return err
 	}
-	s.hub.Publish("message.new", map[string]any{
-		"accountId": acct.ID.String(), "mailboxId": mb.ID.String(),
-		"messageId": inserted.ID.String(), "unread": true,
-	})
+	if bulk == nil {
+		s.hub.Publish("message.new", messageEventPayload(inserted, acct, mb))
+	} else if bulk.due() {
+		s.hub.Publish("mailbox.updated", mailboxProgressEvent(mb, acct))
+	}
 	if acct.DownloadScope == "headers" {
 		return nil
 	}

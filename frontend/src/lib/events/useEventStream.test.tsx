@@ -37,6 +37,12 @@ class MockEventSource {
   fail(): void {
     this.onerror?.(new Event('error'));
   }
+
+  emit(type: string, data: unknown, lastEventId = ''): void {
+    this.listeners.get(type)?.(
+      new MessageEvent(type, { data: JSON.stringify(data), lastEventId }),
+    );
+  }
 }
 
 function Harness() {
@@ -46,11 +52,12 @@ function Harness() {
 
 function renderHarness() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const result = render(
     <QueryClientProvider client={client}>
       <Harness />
     </QueryClientProvider>,
   );
+  return { ...result, client };
 }
 
 function currentSource(): MockEventSource {
@@ -123,5 +130,39 @@ describe('useEventStream', () => {
 
     act(() => vi.advanceTimersByTime(60_000));
     expect(MockEventSource.instances).toHaveLength(1);
+  });
+
+  it('coalesces a burst of mailbox events into one invalidation', () => {
+    const { client } = renderHarness();
+    act(() => currentSource().open());
+    const spy = vi.spyOn(client, 'invalidateQueries');
+
+    act(() => {
+      for (let index = 0; index < 50; index += 1) {
+        currentSource().emit('mailbox.updated', { mailboxId: 'mb-1', bulk: true });
+      }
+    });
+    expect(spy).not.toHaveBeenCalled();
+
+    act(() => vi.advanceTimersByTime(1_000));
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['mailboxes'] });
+  });
+
+  it('recalibrates mailbox and task caches when the tab becomes visible', () => {
+    const { client } = renderHarness();
+    act(() => currentSource().open());
+    const spy = vi.spyOn(client, 'invalidateQueries');
+
+    act(() => {
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'visible',
+        configurable: true,
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['mailboxes'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['tasks'] });
   });
 });

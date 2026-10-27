@@ -178,6 +178,15 @@ func (s *Service) syncIMAPMailbox(ctx context.Context, client *imapclient.Client
 			s.logger.Debug("start sync task", "error", err)
 		}
 	}
+	// Bulk syncs import the whole mailbox history; announcing every message
+	// would make the client issue one request per message. Coalesce instead and
+	// always publish a final event, including on failure or cancellation.
+	bulk := newBulkEvents(initial || len(uids) > bulkEventThreshold)
+	defer func() {
+		if bulk.pending() {
+			s.hub.Publish("mailbox.updated", mailboxProgressEvent(mb, acct))
+		}
+	}()
 	done := 0
 	batchSize := s.envelopeBatchSize()
 	for start := 0; start < len(uids); start += batchSize {
@@ -194,7 +203,7 @@ func (s *Service) syncIMAPMailbox(ctx context.Context, client *imapclient.Client
 			return fmt.Errorf("fetch envelopes: %w", err)
 		}
 		for _, env := range envelopes {
-			if err := s.storeIMAPEnvelope(ctx, acct, mb, env); err != nil {
+			if err := s.storeIMAPEnvelope(ctx, acct, mb, env, bulk); err != nil {
 				s.logger.Warn("store envelope", "message", env.MessageID, "uid", env.UID, "error", err)
 				continue
 			}
@@ -226,6 +235,7 @@ func (s *Service) syncIMAPMailbox(ctx context.Context, client *imapclient.Client
 	s.hub.Publish("mailbox.updated", map[string]any{
 		"mailboxId": mb.ID.String(), "unread": refreshed.Unread, "total": refreshed.Total, "syncState": "idle",
 	})
+	bulk.clear()
 	s.completeTask(ctx, taskType, &acct.ID)
 	return nil
 }
@@ -346,7 +356,7 @@ func (s *Service) applyFlagUpdates(ctx context.Context, mb sqlcgen.Mailbox, upda
 	}
 }
 
-func (s *Service) storeIMAPEnvelope(ctx context.Context, acct sqlcgen.Account, mb sqlcgen.Mailbox, env imapclient.Envelope) error {
+func (s *Service) storeIMAPEnvelope(ctx context.Context, acct sqlcgen.Account, mb sqlcgen.Mailbox, env imapclient.Envelope, bulk *bulkEvents) error {
 	uid := int64(env.UID)
 	dedupe := message.DedupeKey(env.GMailID, env.MessageID, "", mb.ID.String(), &uid)
 	fromJSON, _ := json.Marshal(addressMap(env.From))
@@ -422,10 +432,11 @@ func (s *Service) storeIMAPEnvelope(ctx context.Context, acct sqlcgen.Account, m
 	if err != nil {
 		return err
 	}
-	s.hub.Publish("message.new", map[string]any{
-		"accountId": acct.ID.String(), "mailboxId": mb.ID.String(),
-		"messageId": inserted.ID.String(), "unread": !hasFlag(env.Flags, "\\Seen"),
-	})
+	if bulk == nil {
+		s.hub.Publish("message.new", messageEventPayload(inserted, acct, mb))
+	} else if bulk.due() {
+		s.hub.Publish("mailbox.updated", mailboxProgressEvent(mb, acct))
+	}
 	s.maybePrefetch(acct, mb, inserted)
 	return nil
 }

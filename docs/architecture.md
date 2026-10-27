@@ -502,24 +502,32 @@ sequenceDiagram
 ```
 id: 10231
 event: message.new
-data: {"accountId":"...","mailboxId":"...","messageId":"...","unread":true}
+data: {"accountId":"...","mailboxId":"...","messageId":"...","unread":true,"message":{"id":"...","subject":"...","from":{...},"receivedAt":"...","mailboxRole":"inbox",...}}
 ```
+
+`message.new` 只用于增量新邮件, 并附带列表行渲染所需的轻量摘要 (不含正文和附件); 批量同步不逐封发送.
 
 事件类型:
 
 | 事件 | 触发 |
 | --- | --- |
 | `hello` | 建连成功, 返回当前游标 |
-| `message.new` | 新邮件入库 |
+| `message.new` | 增量新邮件入库, 带轻量摘要 |
 | `message.updated` | 标志, 文件夹, 正文缓存变化 |
 | `message.removed` | 删除或远端消失 |
-| `mailbox.updated` | 未读数, 总数, 同步状态变化 |
+| `mailbox.updated` | 未读数, 总数, 同步状态变化; 批量同步时每秒最多一条 `bulk` 进度事件 |
 | `account.updated` | 账号连接状态或同步错误 |
 | `outbox.updated` | 发件状态变化 |
 | `task.updated` | 后台任务进度或状态变化 |
 | `task.removed` | 任务完成, 取消或超时后移除 |
 
 POP3 轮询发现的新邮件同样发布 `message.new`; 没有服务端推送, 事件延迟上限等于轮询间隔.
+
+批量与增量:
+
+- 首次同步, UIDVALIDITY 重置或一次新增超过 50 封时按批量处理: 不发送 `message.new`, 改为每秒最多一条 `mailbox.updated` 进度事件, 同步结束, 失败或取消时补发一次最终事件.
+- 增量, IDLE 和小批量轮询仍逐封发布 `message.new`, 实时性不变.
+- 前端不按事件逐封请求详情: 有摘要时直接插入列表缓存, 只有 id 时合并为一次列表刷新; 批量同步期间列表最多每 1.5 秒刷新一次.
 
 实现要点:
 
@@ -612,7 +620,7 @@ HTTP 层注意:
 - 账号表单的邮箱和密码使用单行 `textarea` 渲染, 并带密码管理器忽略属性, 避免浏览器自动填充和扩展弹窗把邮箱账号当成登录凭据.
 - TanStack Query 持有所有服务端状态. 组件不直接发请求, 统一走 `features/*/api.ts`.
 - Zustand 只保存界面状态: 当前账号与文件夹, 搜索条件, 侧边栏折叠, 选中邮件, 写邮件窗口, 当前发件账号, 主题和移动端视图.
-- SSE 事件只做缓存失效和局部更新, 不复制完整邮件对象.
+- SSE 事件以通知为主: `message.new` 附带列表行所需的轻量摘要, 正文和附件始终按需加载; 其余事件只做缓存失效, 失效请求按 1-1.5 秒窗口合并, 事件洪峰不放大为逐封 HTTP 请求.
 - 未读, 标记, 归档使用乐观更新, 失败时回滚并提示.
 - 邮件列表使用虚拟滚动, 阅读器正文在独立 iframe 中渲染.
 - HTML 邮件先经 DOMPurify 清洗, 再写入 `sandbox` iframe 的 `srcdoc`; 禁止脚本, 表单和顶层导航. 若清洗后 HTML 为空且纯文本替代存在, 阅读器显示转义后的纯文本.
