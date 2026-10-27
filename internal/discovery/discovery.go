@@ -20,6 +20,7 @@ import (
 	"net"
 	"net/http"
 	"net/mail"
+	"net/netip"
 	"strings"
 	"time"
 )
@@ -564,7 +565,8 @@ func protocolEndpoint(host string, port int, implicitTLS bool) (Endpoint, bool) 
 
 func httpClient() *http.Client {
 	return &http.Client{
-		Timeout: httpBudget,
+		Timeout:   httpBudget,
+		Transport: &http.Transport{DialContext: publicDialContext, TLSHandshakeTimeout: httpBudget},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 3 {
 				return errors.New("too many redirects")
@@ -575,6 +577,64 @@ func httpClient() *http.Client {
 			return nil
 		},
 	}
+}
+
+// blockedPrefixes are special-purpose ranges that must never be reached from a
+// domain-provided autodiscovery URL.
+var blockedPrefixes = []netip.Prefix{
+	netip.MustParsePrefix("0.0.0.0/8"),
+	netip.MustParsePrefix("100.64.0.0/10"),
+	netip.MustParsePrefix("192.0.0.0/24"),
+	netip.MustParsePrefix("192.0.2.0/24"),
+	netip.MustParsePrefix("198.51.100.0/24"),
+	netip.MustParsePrefix("203.0.113.0/24"),
+	netip.MustParsePrefix("240.0.0.0/4"),
+	netip.MustParsePrefix("2001:db8::/32"),
+}
+
+// publicDialContext resolves the target and dials only a public address, so a
+// crafted autodiscovery response cannot make the server probe loopback,
+// private, link-local or metadata endpoints.
+func publicDialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
+	ips, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
+	if err != nil {
+		return nil, err
+	}
+	dialer := &net.Dialer{}
+	var lastErr error
+	for _, ip := range ips {
+		if !publicAddr(ip) {
+			lastErr = fmt.Errorf("discovery: blocked non-public address %s", ip)
+			continue
+		}
+		conn, err := dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
+		if err == nil {
+			return conn, nil
+		}
+		lastErr = err
+	}
+	if lastErr == nil {
+		lastErr = errors.New("discovery: no usable address")
+	}
+	return nil, lastErr
+}
+
+func publicAddr(ip netip.Addr) bool {
+	ip = ip.Unmap()
+	if !ip.IsValid() || ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() {
+		return false
+	}
+	for _, prefix := range blockedPrefixes {
+		if prefix.Contains(ip) {
+			return false
+		}
+	}
+	return true
 }
 
 func xmlEscape(value string) string {
