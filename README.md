@@ -6,7 +6,7 @@ MailQuay is a self-hosted webmail client for mailboxes that already exist. It co
 
 MailQuay is not a mail server. It does not run an MTA, does not own a domain, and does not deliver mail between servers. It is the client layer for mainstream hosted mailboxes, self-hosted IMAP or POP3 servers, and any other standards-compliant mailbox.
 
-> **Status:** implementation. The backend, database migrations, API, synchronization workers and single-page frontend are implemented. Run `make build-full` after building the frontend, or use the Compose stack.
+> **Status:** v0.1.0, the first release. Use the published binaries or the Compose stack; `make build-full` builds from source.
 
 ## Goals
 
@@ -16,7 +16,7 @@ MailQuay is not a mail server. It does not run an MTA, does not own a domain, an
 - **Self-hosted and private.** Credentials are encrypted at rest, mail bodies stay on your server, and remote content in HTML mail is blocked by default.
 - **Boring operations.** One Go binary, one database, one data directory, and Docker Compose.
 
-## Planned features
+## Features
 
 - Multi-account unified inbox, folder tree, and unread counts.
 - IMAP synchronization of folders, flags, and message metadata, with background body prefetch and on-demand fetch for the rest.
@@ -35,7 +35,7 @@ MailQuay is not a mail server. It does not run an MTA, does not own a domain, an
 - Unified views deduplicate the same message across folders with a stable provider ID, Message-ID, or content hash fallback.
 - Non-HTTPS access outside loopback and private ranges shows a permanent red warning above the app.
 - Two backend builds: `mailquay` with embedded frontend assets, and `mailquay-core` as API-only.
-- Centered settings dialog over the mail shell with dedicated navigation, account settings, identities, sync, and appearance.
+- Centered settings dialog over the mail shell with dedicated navigation, account settings, sync, and appearance.
 - OAuth2 (XOAUTH2) for providers that require it, plus app passwords for generic IMAP or POP3 servers.
 - Server-sent events for new mail, flag changes, task progress, and outbox state.
 - A top-right task ring shows running, queued, and failed work with per-task colors and a hover panel; failures stay red until handled.
@@ -77,7 +77,7 @@ The browser only talks to the backend HTTP API. The backend owns IMAP, POP3, and
 | POP3 | `net` + `bufio` | UIDL, TOP, RETR, DELE, STARTTLS and QUIT semantics without a second client library. |
 | SMTP | `github.com/emersion/go-smtp` | Submission, STARTTLS, and XOAUTH2 support. |
 | MIME | `go-message` | Standards-compliant message parsing without hand-rolled boundary handling. |
-| Migrations | `goose` | Embedded PostgreSQL migrations with versioned upgrades. |
+| Migrations | `goose` | Embedded PostgreSQL schema and versioned migrations. |
 | Frontend | React 19 + TypeScript + Vite | Client-side rendering with a fast development loop. |
 | Routing | react-router | Client-side routing over one `index.html`; deep links fall back to the app shell. |
 | Server state | TanStack Query v5 | Cache, optimistic updates, and SSE-driven invalidation. |
@@ -97,18 +97,6 @@ The browser only talks to the backend HTTP API. The backend owns IMAP, POP3, and
 - [Development](docs/development.md): local setup, environment variables, migrations, testing, Git workflow.
 - [Open questions](docs/questions/README.md): numbered decisions that still need an answer.
 - [AGENTS.md](AGENTS.md): repository rules for coding agents and contributors.
-
-## Roadmap
-
-| Milestone | Scope |
-| --- | --- |
-| M0 | Architecture, structure, and development documentation. |
-| M1 | Backend skeleton, configuration, migrations, session auth, account CRUD. |
-| M2 | IMAP initial and incremental sync, POP3 polling compatibility, folder tree, message list and reader. |
-| M3 | Compose, drafts, SMTP delivery, outbox retry, Sent folder append for IMAP and local Sent copies for POP3. |
-| M4 | SSE event stream, Bleve full-text index, attachment streaming. |
-| M5 | OAuth2 providers, HTML mail hardening, keyboard shortcuts, i18n polish. |
-| M6 | Multi-platform binaries, multi-arch images, Compose stack, backup and upgrade documentation. |
 
 ## License
 

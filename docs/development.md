@@ -127,7 +127,9 @@ go run ./cmd/mailquay search reindex --all
 
 - 迁移文件位于 `migrations/postgres`, 使用 goose 格式与编号.
 - 只维护 PostgreSQL 一套迁移, 不引入方言分支.
-- 已合并的迁移不得修改; 修复使用新迁移.
+- `00001_init.sql` 是 v0.1.0 的基线 schema, 只包含当前结构; 不保留预发布数据的兼容或回填迁移.
+- 已发布的迁移不得修改; 后续变更新增迁移文件.
+- 新增迁移覆盖 `Up` 和 `Down`.
 - 迁移必须向后兼容一个版本, 支持先迁移后滚动升级.
 - 大表加列使用可空列或带默认值的在线操作, 避免长时间锁表.
 - 索引创建与数据回填分开提交, 回填脚本必须可重入.
@@ -398,7 +400,7 @@ docker compose -f docker-compose-dev.yml up -d --build
 
 1. 打 `vX.Y.Z` 标签, 工作流从同仓库 `frontend/` 构建前端静态产物.
 2. 等待 `binaries` 和 `images` 两个 job; 两者都成功后 Release 自动创建.
-3. 发布说明写入本地 `.release-notes.md`, 再同步到 GitHub Release.
+3. 发布说明写入根目录 `CHANGELOG.md`, 再同步到 GitHub Release.
 4. 保留 GitHub 自动生成的 `Full Changelog: <previous>...<current>` 链接.
 
 ## 12. 故障排查

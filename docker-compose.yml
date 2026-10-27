@@ -1,5 +1,4 @@
-# Production stack using the published full backend image (API + embedded frontend).
-# The image is a placeholder until the first release workflow publishes it:
+# Production stack using the published full backend image (API + embedded frontend):
 #   ghcr.io/yeqingky/mailquay
 #
 # Usage:

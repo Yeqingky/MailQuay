@@ -6,7 +6,7 @@ MailQuay 是一个面向已有邮箱的自托管 Web 邮件客户端. 它通过 
 
 MailQuay 不是邮件服务器. 它不运行 MTA, 不持有域名, 也不负责服务器之间的投递. 它是主流托管邮箱, 自建 IMAP 或 POP3 以及其他标准邮箱的客户端层.
 
-> **状态:** 实现阶段. 后端, 数据库迁移, API, 同步 worker 和单页前端均已实现. 构建前端后执行 `make build-full`, 或直接使用 Compose 部署.
+> **状态:** v0.1.0, 首个正式版本. 使用已发布的二进制或 Compose 栈; 从源码构建执行 `make build-full`.
 
 ## 目标
 
@@ -16,7 +16,7 @@ MailQuay 不是邮件服务器. 它不运行 MTA, 不持有域名, 也不负责�
 - **自托管与隐私.** 凭据加密存储, 邮件正文留在自己的服务器, HTML 邮件默认阻止远程内容.
 - **运维简单.** 一个 Go 二进制, 一个数据库, 一个数据目录, 以及 Docker Compose.
 
-## 计划功能
+## 功能
 
 - 多账号统一收件箱, 文件夹树, 未读数.
 - IMAP 同步文件夹, 标志和邮件元数据, 后台预取正文, 其余按需拉取.
@@ -35,7 +35,7 @@ MailQuay 不是邮件服务器. 它不运行 MTA, 不持有域名, 也不负责�
 - 结构化搜索支持标题/全部模式, 并可组合账号, 文件夹, 收件人, 发件人和附件条件.
 - 非 HTTPS 且不在 loopback 或私网范围时, 应用顶部显示不可关闭的红色安全提醒.
 - 后端分为 `mailquay` (内嵌已构建前端) 和 `mailquay-core` (仅提供 API).
-- 居中浮层的设置弹窗, 包含账号设置, 身份, 同步和外观.
+- 居中浮层的设置弹窗, 包含账号设置, 同步和外观.
 - 需要 OAuth2 的服务商使用 XOAUTH2, 通用 IMAP 或 POP3 使用应用专用密码.
 - 通过 Server-Sent Events 推送新邮件, 标志变化, 任务进度和发件状态.
 - 内容区右上角的任务环显示运行中, 待运行和失败任务, 不同任务使用不同颜色, 失败保持红色直到处理; 悬停展开任务面板.
@@ -77,7 +77,7 @@ flowchart LR
 | POP3 | `net` + `bufio` | 自行实现 UIDL, TOP, RETR, DELE, STARTTLS 和 QUIT 语义, 不引入第二个客户端库. |
 | SMTP | `github.com/emersion/go-smtp` | 提交, STARTTLS 和 XOAUTH2 支持. |
 | MIME | `go-message` | 标准兼容的解析, 避免手写 boundary 处理. |
-| 迁移 | `goose` | 内嵌 PostgreSQL 迁移, 版本化升级. |
+| 迁移 | `goose` | 内嵌 PostgreSQL schema 与版本化迁移. |
 | 前端 | React 19 + TypeScript + Vite | 客户端渲染, 开发反馈快. |
 | 路由 | `react-router` | 单个 `index.html` 上的客户端路由, 深链接回落到应用壳. |
 | 服务端状态 | TanStack Query v5 | 缓存, 乐观更新, 由 SSE 驱动失效. |
@@ -97,18 +97,6 @@ flowchart LR
 - [开发文档](docs/development.md): 本地启动, 环境变量, 数据库迁移, 测试, Git 工作流.
 - [待确认问题](docs/questions/README.md): 按编号排列, 等待逐个回答.
 - [AGENTS.md](AGENTS.md): 面向编码代理和贡献者的仓库规则.
-
-## 路线图
-
-| 里程碑 | 范围 |
-| --- | --- |
-| M0 | 架构, 结构, 开发文档. |
-| M1 | 后端骨架, 配置, 迁移, 会话认证, 账号增删改查. |
-| M2 | IMAP 初次与增量同步, POP3 轮询兼容, 文件夹树, 邮件列表与阅读器. |
-| M3 | 写邮件, 草稿, SMTP 投递, 发件重试, IMAP 追加已发送, POP3 本地保存副本. |
-| M4 | SSE 事件流, Bleve 全文索引, 附件流式下载. |
-| M5 | OAuth2 接入, HTML 邮件加固, 快捷键, 国际化完善. |
-| M6 | 多平台二进制, 多架构镜像, Compose 栈, 备份与升级文档. |
 
 ## 许可证
 

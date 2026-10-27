@@ -152,7 +152,8 @@ pnpm generate:api
 - 主键使用 UUIDv7, 时间统一 UTC.
 - 新增或修改 IMAP/POP3 操作时, 必须说明失败重试, 连接中断后的行为; IMAP 还要覆盖 UIDVALIDITY 变化, POP3 要覆盖 UIDL 变化和 DELE 提交语义.
 - 新增环境变量时, 同步更新 `docs/development.md` 和 `.env.example`.
-- 新增迁移时只写 `migrations/postgres`, 覆盖升级和回滚.
+- 新增迁移时只写 `migrations/postgres`, 覆盖升级和回滚; 已发布的迁移不修改.
+- 不为预发布阶段的数据, 接口或客户端保留兼容代码; 兼容分支只用于已发布版本之间的升级.
 - 邮件或标志变更必须在同一事务写入 `search_jobs`; 索引失败不得回滚邮件写入.
 - Bleve 索引只允许一个进程打开, 启动和退出必须正确获取和释放索引锁.
 - 修改搜索字段或分析器时, 提升 `search_mapping_version`, 并提供重建路径.
@@ -239,7 +240,7 @@ pnpm generate:api
 - 修改接口, 表结构, 环境变量, 部署方式或业务规则时, 同一提交更新相关文档.
 - `README.md` 与 `README_CN.md` 保持内容对应, 不把 README 当变更日志.
 - 移除功能时同步删除文档描述, 不保留 "已移除" 之类的历史段落.
-- 发布后更新 `.release-notes.md`, 并同步到 GitHub Release, 保留自动生成的 changelog 链接.
+- 发布后更新根目录 `CHANGELOG.md`, 并同步到 GitHub Release, 保留自动生成的 changelog 链接.
 
 ## 9. Git
 

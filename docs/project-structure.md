@@ -169,26 +169,25 @@ frontend/
 │   │   ├── ComposePage.tsx         # 新窗口模式
 │   │   ├── NotFoundPage.tsx        # 未匹配路径
 │   │   └── settings/
+│   │       ├── AboutPage.tsx
 │   │       ├── AccountPage.tsx
-│   │       ├── MailAccountsPage.tsx
-│   │       ├── IdentitiesPage.tsx
-│   │       ├── GeneralPage.tsx
+│   │       ├── AccountsPage.tsx
 │   │       ├── MailSettingsPage.tsx
+│   │       ├── OAuthPage.tsx
 │   │       ├── PerformancePage.tsx
-│   │       ├── ShortcutsPage.tsx
-│   │       └── AboutPage.tsx
+│   │       ├── PreferencesPage.tsx
+│   │       └── ServerPage.tsx
 │   ├── features/
-│   │   ├── auth/
 │   │   ├── accounts/
-│   │   ├── identities/
+│   │   ├── archive/                # 本地归档列表, 阅读, 附件
+│   │   ├── auth/
+│   │   ├── compose/                # 写邮件浮层, 发件账号选择, 草稿
 │   │   ├── mailboxes/
 │   │   ├── message-list/
 │   │   ├── message-view/
-│   │   ├── archive/                # 本地归档列表, 阅读, 附件
-│   │   ├── compose/                # 写邮件浮层, 发件账号选择, 草稿
 │   │   ├── search/
-│   │   ├── tasks/                  # 任务中心, 进度聚合
-│   │   └── settings/
+│   │   ├── settings/
+│   │   └── tasks/                  # 任务中心, 进度聚合
 │   ├── components/
 │   │   ├── ui/                     # shadcn/ui 生成组件
 │   │   ├── layout/                 # Sidebar, TopBar, UserMenu, InsecureTransportBanner, SettingsSidebar
