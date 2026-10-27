@@ -3,6 +3,8 @@ package sync
 import (
 	"context"
 	"errors"
+	"io"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -54,10 +56,13 @@ func TestMergeSyncRequestsDeduplicatesAndPromotesFullSync(t *testing.T) {
 
 func TestMailboxSyncIntervalsAndJitter(t *testing.T) {
 	values := settings.Defaults()
-	if got := mailboxInterval(sqlcgen.Mailbox{Role: "inbox"}, values); got != 10*time.Minute {
+	if got := mailboxInterval(sqlcgen.Mailbox{Role: "inbox"}, values, false); got != 10*time.Minute {
 		t.Fatalf("inbox interval = %v, want 10m", got)
 	}
-	if got := mailboxInterval(sqlcgen.Mailbox{Role: "custom"}, values); got != 15*time.Minute {
+	if got := mailboxInterval(sqlcgen.Mailbox{Role: "inbox"}, values, true); got != 3*time.Minute {
+		t.Fatalf("inbox interval without IDLE = %v, want 3m", got)
+	}
+	if got := mailboxInterval(sqlcgen.Mailbox{Role: "custom"}, values, true); got != 15*time.Minute {
 		t.Fatalf("other mailbox interval = %v, want 15m", got)
 	}
 	for range 100 {
@@ -88,6 +93,42 @@ func TestIdleCapacityReservesConcurrentWorkerSlots(t *testing.T) {
 			t.Errorf("idleCapacityFits(%d, %d, %d, %d) = %v, want %v",
 				tc.accountCount, tc.perAccountLimit, tc.perServerLimit, tc.syncLimit, got, tc.want)
 		}
+	}
+}
+
+func TestMarkIdleUnsupportedShortensInboxPoll(t *testing.T) {
+	svc := &Service{
+		logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+		noIdle:   make(map[uuid.UUID]bool),
+		nextSync: make(map[uuid.UUID]time.Time),
+		failures: make(map[uuid.UUID]int),
+	}
+	accountID, mailboxID := uuid.New(), uuid.New()
+	inbox := sqlcgen.Mailbox{ID: mailboxID, AccountID: accountID, Role: "inbox"}
+	later := time.Now().Add(10 * time.Minute)
+	svc.nextSync[mailboxID] = later
+
+	before := time.Now()
+	svc.markIdleUnsupported(inbox, settings.Defaults())
+
+	if !svc.noIdle[accountID] {
+		t.Fatal("account was not marked as lacking IDLE")
+	}
+	next := svc.nextSync[mailboxID]
+	// 180 seconds with the ±10% jitter never exceeds 198 seconds.
+	if next.After(before.Add(199 * time.Second)) {
+		t.Fatalf("next poll = %v, want at most 198s", next.Sub(before))
+	}
+	if next.Before(before) {
+		t.Fatalf("next poll = %v, want a future time", next)
+	}
+
+	// An already sooner poll must not be pushed back by the probe.
+	soon := time.Now().Add(time.Minute)
+	svc.nextSync[mailboxID] = soon
+	svc.markIdleUnsupported(inbox, settings.Defaults())
+	if !svc.nextSync[mailboxID].Equal(soon) {
+		t.Fatalf("next poll = %v, want the sooner %v", svc.nextSync[mailboxID], soon)
 	}
 }
 

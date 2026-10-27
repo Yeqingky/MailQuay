@@ -77,7 +77,8 @@ func TestValidate(t *testing.T) {
 }
 func TestIMAPSyncSettingsDefaultsAndBounds(t *testing.T) {
 	values := Defaults()
-	if values.SyncIntervalSeconds != 600 || values.OtherMailboxSyncIntervalSeconds != 900 ||
+	if values.SyncIntervalSeconds != 600 || values.NoIdleSyncIntervalSeconds != 180 ||
+		values.OtherMailboxSyncIntervalSeconds != 900 ||
 		!values.AutoSync || !values.RealTimeReceive || !values.StartupSync ||
 		values.MaxIMAPConnectionsPerAccount != 2 || values.IMAPWorkIdleTimeoutSeconds != 600 ||
 		values.MaxIMAPConnectionsPerServer != 8 || values.MaxConcurrentSyncsPerServer != 2 ||
@@ -93,6 +94,8 @@ func TestIMAPSyncSettingsDefaultsAndBounds(t *testing.T) {
 		mutate func(*Values)
 	}{
 		{"inbox interval below minimum", func(v *Values) { v.SyncIntervalSeconds = 29 }},
+		{"no-idle interval below minimum", func(v *Values) { v.NoIdleSyncIntervalSeconds = 29 }},
+		{"no-idle interval above maximum", func(v *Values) { v.NoIdleSyncIntervalSeconds = 86401 }},
 		{"other folder interval above maximum", func(v *Values) { v.OtherMailboxSyncIntervalSeconds = 86401 }},
 		{"account connections below minimum", func(v *Values) { v.MaxIMAPConnectionsPerAccount = 0 }},
 		{"account connections above maximum", func(v *Values) { v.MaxIMAPConnectionsPerAccount = 4 }},

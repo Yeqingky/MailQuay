@@ -1768,6 +1768,7 @@ components:
         resources: { $ref: '#/components/schemas/ResourceInfo' }
         sessionTtlHours: { type: integer }
         syncIntervalSeconds: { type: integer }
+        noIdleSyncIntervalSeconds: { type: integer }
         otherMailboxSyncIntervalSeconds: { type: integer }
         autoSync: { type: boolean }
         realTimeReceive: { type: boolean }
@@ -1785,7 +1786,7 @@ components:
         googleSecretSet: { type: boolean }
         microsoftSecretSet: { type: boolean }
         logLevel: { type: string, enum: [debug, info, warn, error] }
-      required: [defaultInitialSyncRange, defaultDownloadScope, preserveMarkedOnAccountDelete, sentSyncMode, draftSyncMode, draftPullIntervalSeconds, draftPushDelaySeconds, composeWindowMode, sendRetryLimit, networkAvatars, gravatarAvatars, bimiAvatars, googleFaviconAvatars, timezone, language, removeReadImmediately, prependNewMessages, envelopeBatchSize, searchConcurrency, indexBatchSize, autoLocalConcurrency, concurrency, resources, sessionTtlHours, syncIntervalSeconds, otherMailboxSyncIntervalSeconds, autoSync, realTimeReceive, startupSync, maxImapConnectionsPerAccount, imapWorkIdleTimeoutSeconds, maxImapConnectionsPerServer, maxConcurrentSyncsPerServer, autoReconnect, pop3IntervalSeconds, bodyPrefetchMaxBytes, maxAttachmentBytes, googleClientId, microsoftClientId, googleSecretSet, microsoftSecretSet]
+      required: [defaultInitialSyncRange, defaultDownloadScope, preserveMarkedOnAccountDelete, sentSyncMode, draftSyncMode, draftPullIntervalSeconds, draftPushDelaySeconds, composeWindowMode, sendRetryLimit, networkAvatars, gravatarAvatars, bimiAvatars, googleFaviconAvatars, timezone, language, removeReadImmediately, prependNewMessages, envelopeBatchSize, searchConcurrency, indexBatchSize, autoLocalConcurrency, concurrency, resources, sessionTtlHours, syncIntervalSeconds, noIdleSyncIntervalSeconds, otherMailboxSyncIntervalSeconds, autoSync, realTimeReceive, startupSync, maxImapConnectionsPerAccount, imapWorkIdleTimeoutSeconds, maxImapConnectionsPerServer, maxConcurrentSyncsPerServer, autoReconnect, pop3IntervalSeconds, bodyPrefetchMaxBytes, maxAttachmentBytes, googleClientId, microsoftClientId, googleSecretSet, microsoftSecretSet]
     SettingsUpdate:
       type: object
       properties:
@@ -1814,6 +1815,7 @@ components:
         autoLocalConcurrency: { type: boolean }
         sessionTtlHours: { type: integer, minimum: 1, maximum: 8760 }
         syncIntervalSeconds: { type: integer, minimum: 30, maximum: 86400 }
+        noIdleSyncIntervalSeconds: { type: integer, minimum: 30, maximum: 86400 }
         pop3IntervalSeconds: { type: integer, minimum: 30, maximum: 86400 }
         otherMailboxSyncIntervalSeconds: { type: integer, minimum: 30, maximum: 86400 }
         autoSync: { type: boolean }

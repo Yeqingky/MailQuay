@@ -969,6 +969,7 @@ type Settings struct {
 	MicrosoftClientId               string                          `json:"microsoftClientId"`
 	MicrosoftSecretSet              bool                            `json:"microsoftSecretSet"`
 	NetworkAvatars                  bool                            `json:"networkAvatars"`
+	NoIdleSyncIntervalSeconds       int                             `json:"noIdleSyncIntervalSeconds"`
 	OtherMailboxSyncIntervalSeconds int                             `json:"otherMailboxSyncIntervalSeconds"`
 	Pop3IntervalSeconds             int                             `json:"pop3IntervalSeconds"`
 	PrependNewMessages              bool                            `json:"prependNewMessages"`
@@ -1036,6 +1037,7 @@ type SettingsUpdate struct {
 	MicrosoftClientId               *string                                `json:"microsoftClientId,omitempty"`
 	MicrosoftClientSecret           *string                                `json:"microsoftClientSecret,omitempty"`
 	NetworkAvatars                  *bool                                  `json:"networkAvatars,omitempty"`
+	NoIdleSyncIntervalSeconds       *int                                   `json:"noIdleSyncIntervalSeconds,omitempty"`
 	OtherMailboxSyncIntervalSeconds *int                                   `json:"otherMailboxSyncIntervalSeconds,omitempty"`
 	Pop3IntervalSeconds             *int                                   `json:"pop3IntervalSeconds,omitempty"`
 	PrependNewMessages              *bool                                  `json:"prependNewMessages,omitempty"`

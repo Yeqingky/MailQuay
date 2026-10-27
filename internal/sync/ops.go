@@ -12,6 +12,7 @@ import (
 	"github.com/mailquay/mailquay/internal/imapclient"
 	"github.com/mailquay/mailquay/internal/mailsession"
 	"github.com/mailquay/mailquay/internal/platform"
+	"github.com/mailquay/mailquay/internal/settings"
 	"github.com/mailquay/mailquay/internal/store/sqlcgen"
 )
 
@@ -253,10 +254,7 @@ func (s *Service) idleLoop(ctx context.Context, accountID uuid.UUID) {
 
 		changed, _, err := s.sessions.RunIdleRound(ctx, acct.ID, inbox.Path, 25*time.Minute, dial)
 		if errors.Is(err, mailsession.ErrIdleUnsupported) {
-			s.mu.Lock()
-			s.noIdle[accountID] = true
-			s.mu.Unlock()
-			s.logger.Info("imap IDLE unsupported; using periodic sync", "account", accountID)
+			s.markIdleUnsupported(inbox, values)
 			return
 		}
 		if err != nil {
@@ -288,6 +286,24 @@ func (s *Service) idleLoop(ctx context.Context, accountID uuid.UUID) {
 			s.enqueueRequest(ctx, syncRequest{accountID: acct.ID, mailboxID: inbox.ID, priority: 2})
 		}
 	}
+}
+
+// markIdleUnsupported switches the account to polling with the dedicated
+// interval. The probe runs while entering IDLE, so the capability is checked
+// once per process; an account edit or restart probes the server again.
+func (s *Service) markIdleUnsupported(inbox sqlcgen.Mailbox, values settings.Values) {
+	interval := time.Duration(values.NoIdleSyncIntervalSeconds) * time.Second
+
+	s.mu.Lock()
+	s.noIdle[inbox.AccountID] = true
+	next := time.Now().Add(jitterInterval(backoffDelay(interval, s.failures[inbox.AccountID])))
+	if current, ok := s.nextSync[inbox.ID]; !ok || current.After(next) {
+		s.nextSync[inbox.ID] = next
+	}
+	s.mu.Unlock()
+
+	s.logger.Info("imap IDLE unsupported; polling inbox",
+		"account", inbox.AccountID, "interval", interval)
 }
 
 func sleepCtx(ctx context.Context, d time.Duration) bool {

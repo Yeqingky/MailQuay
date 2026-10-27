@@ -359,6 +359,7 @@ func (s *Service) mailboxDue(mb sqlcgen.Mailbox, values settings.Values, now tim
 	s.mu.Lock()
 	next, scheduled := s.nextSync[mb.ID]
 	failures := s.failures[mb.AccountID]
+	noIdle := s.noIdle[mb.AccountID]
 	s.mu.Unlock()
 	if scheduled {
 		return !now.Before(next)
@@ -366,11 +367,14 @@ func (s *Service) mailboxDue(mb sqlcgen.Mailbox, values settings.Values, now tim
 	if mb.LastSyncedAt == nil {
 		return true
 	}
-	return now.Sub(*mb.LastSyncedAt) >= backoffDelay(mailboxInterval(mb, values), failures)
+	return now.Sub(*mb.LastSyncedAt) >= backoffDelay(mailboxInterval(mb, values, noIdle), failures)
 }
 
-func mailboxInterval(mb sqlcgen.Mailbox, values settings.Values) time.Duration {
+func mailboxInterval(mb sqlcgen.Mailbox, values settings.Values, noIdle bool) time.Duration {
 	if mb.Role == "inbox" {
+		if noIdle {
+			return time.Duration(values.NoIdleSyncIntervalSeconds) * time.Second
+		}
 		return time.Duration(values.SyncIntervalSeconds) * time.Second
 	}
 	return time.Duration(values.OtherMailboxSyncIntervalSeconds) * time.Second
@@ -378,7 +382,7 @@ func mailboxInterval(mb sqlcgen.Mailbox, values settings.Values) time.Duration {
 
 func (s *Service) setNextMailboxSync(mb sqlcgen.Mailbox, values settings.Values, now time.Time) {
 	s.mu.Lock()
-	interval := backoffDelay(mailboxInterval(mb, values), s.failures[mb.AccountID])
+	interval := backoffDelay(mailboxInterval(mb, values, s.noIdle[mb.AccountID]), s.failures[mb.AccountID])
 	s.nextSync[mb.ID] = now.Add(jitterInterval(interval))
 	s.mu.Unlock()
 }

@@ -46,6 +46,7 @@ type Values struct {
 	EnvelopeBatchSize               int    `json:"envelopeBatchSize"`
 	SessionTTLHours                 int    `json:"sessionTtlHours"`
 	SyncIntervalSeconds             int    `json:"syncIntervalSeconds"`
+	NoIdleSyncIntervalSeconds       int    `json:"noIdleSyncIntervalSeconds"`
 	OtherMailboxSyncIntervalSeconds int    `json:"otherMailboxSyncIntervalSeconds"`
 	POP3IntervalSeconds             int    `json:"pop3IntervalSeconds"`
 	AutoSync                        bool   `json:"autoSync"`
@@ -128,6 +129,7 @@ func Defaults() Values {
 		EnvelopeBatchSize:               50,
 		SessionTTLHours:                 168,
 		SyncIntervalSeconds:             600,
+		NoIdleSyncIntervalSeconds:       180,
 		OtherMailboxSyncIntervalSeconds: 900,
 		POP3IntervalSeconds:             300,
 		AutoSync:                        true,
@@ -491,6 +493,8 @@ func decodeInto(key string, raw json.RawMessage, v *Values) error {
 		return json.Unmarshal(raw, &v.SessionTTLHours)
 	case "sync_interval_seconds":
 		return json.Unmarshal(raw, &v.SyncIntervalSeconds)
+	case "no_idle_sync_interval_seconds":
+		return json.Unmarshal(raw, &v.NoIdleSyncIntervalSeconds)
 	case "pop3_interval_seconds":
 		return json.Unmarshal(raw, &v.POP3IntervalSeconds)
 	case "other_mailbox_sync_interval_seconds":
@@ -577,6 +581,8 @@ func setField(key string, raw json.RawMessage, v *Values) error {
 		return json.Unmarshal(raw, &v.SessionTTLHours)
 	case "sync_interval_seconds":
 		return json.Unmarshal(raw, &v.SyncIntervalSeconds)
+	case "no_idle_sync_interval_seconds":
+		return json.Unmarshal(raw, &v.NoIdleSyncIntervalSeconds)
 	case "pop3_interval_seconds":
 		return json.Unmarshal(raw, &v.POP3IntervalSeconds)
 	case "other_mailbox_sync_interval_seconds":
@@ -663,6 +669,8 @@ func fieldValue(key string, v Values) (any, error) {
 		return v.SessionTTLHours, nil
 	case "sync_interval_seconds":
 		return v.SyncIntervalSeconds, nil
+	case "no_idle_sync_interval_seconds":
+		return v.NoIdleSyncIntervalSeconds, nil
 	case "pop3_interval_seconds":
 		return v.POP3IntervalSeconds, nil
 	case "other_mailbox_sync_interval_seconds":
@@ -747,6 +755,9 @@ func validate(v Values) error {
 	}
 	if v.SyncIntervalSeconds < 30 || v.SyncIntervalSeconds > 86400 {
 		return errors.New("syncIntervalSeconds must be 30-86400")
+	}
+	if v.NoIdleSyncIntervalSeconds < 30 || v.NoIdleSyncIntervalSeconds > 86400 {
+		return errors.New("noIdleSyncIntervalSeconds must be 30-86400")
 	}
 	if v.POP3IntervalSeconds < 30 || v.POP3IntervalSeconds > 86400 {
 		return errors.New("pop3IntervalSeconds must be 30-86400")
