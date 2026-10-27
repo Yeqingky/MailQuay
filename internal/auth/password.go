@@ -19,10 +19,13 @@ const (
 	argonSaltLen = 16
 )
 
+// ErrWeakPassword marks passwords rejected by the minimum length rule.
+var ErrWeakPassword = errors.New("password must be at least 8 characters")
+
 // HashPassword returns an Argon2id PHC string.
 func HashPassword(password string) (string, error) {
 	if len(password) < 8 {
-		return "", errors.New("password must be at least 8 characters")
+		return "", ErrWeakPassword
 	}
 	salt := make([]byte, argonSaltLen)
 	if _, err := rand.Read(salt); err != nil {

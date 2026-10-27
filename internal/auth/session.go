@@ -80,20 +80,25 @@ func (s *Service) NeedsSetup(ctx context.Context) (bool, error) {
 	return n == 0, nil
 }
 
-// consumeSetupToken reports whether token matches the one-time setup token and
-// invalidates it in the same critical section, so concurrent setups cannot both
-// pass the check.
-func (s *Service) consumeSetupToken(token string) bool {
+// validSetupToken reports whether token matches the configured one-time token
+// without consuming it, so a failed attempt such as a weak password or a
+// transient database error can be retried with the same token.
+func (s *Service) validSetupToken(token string) bool {
 	if strings.TrimSpace(token) == "" {
 		return false
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.setupToken == "" || subtle.ConstantTimeCompare([]byte(token), []byte(s.setupToken)) != 1 {
-		return false
-	}
+	return s.setupToken != "" && subtle.ConstantTimeCompare([]byte(token), []byte(s.setupToken)) == 1
+}
+
+// invalidateSetupToken clears the token once the owner account exists. The
+// unique singleton index on users keeps concurrent setups from creating two
+// owners while the token is still valid.
+func (s *Service) invalidateSetupToken() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.setupToken = ""
-	return true
 }
 
 // Setup creates the owner account and a session. Attempts are rate limited per
@@ -102,19 +107,20 @@ func (s *Service) Setup(ctx context.Context, token, username, password, userAgen
 	if !s.setupLimiter.Allow(ip) {
 		return nil, ErrRateLimited
 	}
-	if !s.consumeSetupToken(token) {
-		return nil, ErrInvalidSetupToken
-	}
 	needs, err := s.NeedsSetup(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if !needs {
+		s.invalidateSetupToken()
 		return nil, ErrSetupClosed
 	}
 	hash, err := HashPassword(password)
 	if err != nil {
 		return nil, err
+	}
+	if !s.validSetupToken(token) {
+		return nil, ErrInvalidSetupToken
 	}
 	user, err := s.store.CreateUser(ctx, sqlcgen.CreateUserParams{
 		ID:           uuid.MustParse(platform.NewID()),
@@ -130,6 +136,7 @@ func (s *Service) Setup(ctx context.Context, token, username, password, userAgen
 		}
 		return nil, fmt.Errorf("create owner: %w", err)
 	}
+	s.invalidateSetupToken()
 	return s.createSession(ctx, user, userAgent)
 }
 

@@ -54,6 +54,8 @@ func (s *Server) SetupOwner(w http.ResponseWriter, r *http.Request) {
 			s.error(w, r, http.StatusBadRequest, "invalid_setup_token", "The setup token is invalid.")
 		case errors.Is(err, auth.ErrSetupClosed):
 			s.error(w, r, http.StatusConflict, "setup_closed", "The owner account already exists.")
+		case errors.Is(err, auth.ErrWeakPassword):
+			s.error(w, r, http.StatusBadRequest, "weak_password", err.Error())
 		default:
 			s.error(w, r, http.StatusBadRequest, "setup_failed", "Setup failed.")
 		}
@@ -113,6 +115,10 @@ func (s *Server) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	if err := s.auth.ChangePassword(r.Context(), user.ID, body.CurrentPassword, body.NewPassword, token); err != nil {
 		if errors.Is(err, auth.ErrInvalidCredentials) {
 			s.error(w, r, http.StatusUnauthorized, "invalid_credentials", "The current password is incorrect.")
+			return
+		}
+		if errors.Is(err, auth.ErrWeakPassword) {
+			s.error(w, r, http.StatusBadRequest, "weak_password", err.Error())
 			return
 		}
 		s.error(w, r, http.StatusBadRequest, "password_change_failed", "The password could not be changed.")

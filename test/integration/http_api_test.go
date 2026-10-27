@@ -58,6 +58,22 @@ func TestHTTPAuthAndAccountFlow(t *testing.T) {
 	if status["needsSetup"] != true {
 		t.Fatalf("needsSetup = %v", status["needsSetup"])
 	}
+	// A rejected setup must keep the token usable and name the reason.
+	weak := postJSON(t, client, base+"/auth/setup", map[string]any{
+		"token": "setup-token", "username": "owner", "password": "short",
+	}, "")
+	var weakBody map[string]any
+	if err := json.NewDecoder(weak.Body).Decode(&weakBody); err != nil {
+		t.Fatal(err)
+	}
+	weak.Body.Close()
+	if weak.StatusCode != http.StatusBadRequest {
+		t.Fatalf("weak password setup status %d", weak.StatusCode)
+	}
+	weakDetail, _ := weakBody["error"].(map[string]any)
+	if message, _ := weakDetail["message"].(string); !strings.Contains(message, "at least 8 characters") {
+		t.Fatalf("weak password message = %q", message)
+	}
 	resp := postJSON(t, client, base+"/auth/setup", map[string]any{
 		"token": "setup-token", "username": "owner", "password": "supersecret1",
 	}, "")
@@ -80,7 +96,7 @@ func TestHTTPAuthAndAccountFlow(t *testing.T) {
 			limited = true
 			break
 		}
-		if status != http.StatusBadRequest {
+		if status != http.StatusBadRequest && status != http.StatusConflict {
 			t.Fatalf("setup attempt status %d: %s", status, body)
 		}
 	}

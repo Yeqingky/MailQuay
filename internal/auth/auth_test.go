@@ -145,37 +145,42 @@ func TestLimiterRejectsNewKeysAtCapacity(t *testing.T) {
 	}
 }
 
-func TestConsumeSetupTokenSingleUse(t *testing.T) {
+func TestSetupTokenSurvivesFailedAttempts(t *testing.T) {
 	svc := &Service{setupToken: "one-time"}
-	if svc.consumeSetupToken("wrong") {
+	if svc.validSetupToken("wrong") {
 		t.Fatal("wrong token accepted")
 	}
-	if svc.consumeSetupToken("") {
+	if svc.validSetupToken("") {
 		t.Fatal("empty token accepted")
 	}
-	if !svc.consumeSetupToken("one-time") {
+	if !svc.validSetupToken("one-time") {
 		t.Fatal("valid token rejected")
 	}
-	if svc.consumeSetupToken("one-time") {
-		t.Fatal("token accepted twice")
+	if !svc.validSetupToken("one-time") {
+		t.Fatal("failed attempt consumed the token")
+	}
+	svc.invalidateSetupToken()
+	if svc.validSetupToken("one-time") {
+		t.Fatal("invalidated token still accepted")
 	}
 }
 
-func TestConsumeSetupTokenConcurrent(t *testing.T) {
+func TestSetupTokenConcurrentValidation(t *testing.T) {
 	svc := &Service{setupToken: "one-time"}
-	var wins atomic.Int32
+	svc.invalidateSetupToken()
+	var accepted atomic.Int32
 	var wg sync.WaitGroup
 	for range 8 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if svc.consumeSetupToken("one-time") {
-				wins.Add(1)
+			if svc.validSetupToken("one-time") {
+				accepted.Add(1)
 			}
 		}()
 	}
 	wg.Wait()
-	if wins.Load() != 1 {
-		t.Fatalf("token consumed %d times, want 1", wins.Load())
+	if accepted.Load() != 0 {
+		t.Fatalf("invalidated token accepted %d times", accepted.Load())
 	}
 }
