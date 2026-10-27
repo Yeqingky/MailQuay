@@ -411,13 +411,13 @@ frontend/
 | `/compose` | 浏览器新窗口模式下的写邮件页 |
 | `/login` | 登录 |
 | `/setup` | 首次创建所有者账号 |
-| `/settings/general` | 外观, 语言, 时区 |
+| `/settings/preferences` | 外观, 语言, 时区 |
 | `/settings/account` | 个人资料和密码 |
 | `/settings/accounts` | 邮箱账号和连接 |
 | `/settings/mail` | 同步, 存储, 发送与草稿 |
 | `/settings/performance` | 资源检测和并发 |
-| `/settings/shortcuts` | 快捷键 |
-| `/settings/server` | 网络, OAuth, 日志等运行时参数 |
+| `/settings/server` | 网络, 限制与日志等运行时参数 |
+| `/settings/oauth` | 邮箱授权使用的 OAuth 应用凭据 |
 | `/settings/about` | 版本与诊断 |
 
 每类页面路径对应一个客户端路由, 由单个 `index.html` 和 `react-router` 渲染. 邮件视图共用 `MailPage`, 根据路径选择视图; 设置页面根据 `:group` 路径参数选择分组. 页面之间使用路由跳转, 不重新加载文档; 服务端把未命中的非资源路径回落到 `index.html`.

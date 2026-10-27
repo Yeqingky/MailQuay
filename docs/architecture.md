@@ -156,7 +156,7 @@ OAuth2 流程:
 | Google | `imap.gmail.com:993` | `pop.gmail.com:995` | `smtp.gmail.com:465` | `https://mail.google.com/` |
 | Microsoft | `outlook.office365.com:993` | `outlook.office365.com:995` | `smtp.office365.com:587` | `offline_access`, `https://outlook.office.com/IMAP.AccessAsUser.All`, `https://outlook.office.com/SMTP.Send` |
 
-OAuth 应用凭据通过环境变量注入. 回调地址固定为 `{MAILQUAY_PUBLIC_URL}/api/v1/oauth/{provider}/callback`, 必须在服务商控制台登记.
+OAuth 应用凭据保存在 `settings` 表, 在设置页的"OAuth 应用"分组填写. 回调地址固定为 `{MAILQUAY_PUBLIC_URL}/api/v1/oauth/{provider}/callback`, 必须在服务商控制台登记.
 
 Google 的 `https://mail.google.com/` 属于受限 scope. 公开分发前需要完成 Google OAuth 验证; 自用测试模式需要把账号加入测试用户, token 也会在测试模式到期后失效.
 
@@ -454,7 +454,8 @@ sequenceDiagram
 ### 4.7 运行时配置
 
 - 除数据库连接, 监听地址, 数据目录, 搜索目录, 主密钥和一次性 setup token 外, 运行参数都保存在 `settings` 表.
-- 设置页的"服务器"分组提供 POP3 轮询间隔, 正文预取上限, 附件上限, OAuth 客户端与密钥, 日志级别和并发模式; 同步间隔由"邮件"设置管理. 公开地址, CORS, 可信代理和免提醒域名只通过环境变量配置.
+- 设置页的"服务器"分组提供 POP3 轮询间隔, 正文预取上限, 附件上限, 日志级别和并发模式; 同步间隔由"邮件"设置管理. 公开地址, CORS, 可信代理和免提醒域名只通过环境变量配置.
+- 设置页的"OAuth 应用"分组单独提供 Google 和 Microsoft 的客户端 ID 与密钥.
 - 环境变量 `MAILQUAY_PUBLIC_URL` 和 `MAILQUAY_TRUSTED_PROXIES` 只作为首次启动的默认值, 数据库中存在同名字段后以数据库为准.
 - OAuth 客户端密钥使用主密钥加密后写入 `settings`, API 只返回是否已配置, 不回传明文.
 - 网络头像总开关和 Gravatar, BIMI, Google favicon 子开关保存在 `settings`; 后端在请求上游前检查, 关闭后不再发起对应外部请求, 不仅依赖前端隐藏.
