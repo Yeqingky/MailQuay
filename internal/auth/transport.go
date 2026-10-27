@@ -98,22 +98,39 @@ func hostOnly(hostport string) string {
 	return strings.Trim(host, "[]")
 }
 
-// ClientIP returns the direct peer address, using X-Forwarded-For only behind a trusted proxy.
+// ClientIP returns the client address for rate limiting. Behind a trusted proxy
+// it walks X-Forwarded-For from the right and returns the first hop that is not
+// itself a trusted proxy, so client-supplied entries on the left cannot spoof it.
 func ClientIP(r *http.Request, trustedProxies []string) string {
 	peer := hostOnly(r.RemoteAddr)
 	addr, err := netip.ParseAddr(peer)
-	if err != nil {
+	if err != nil || !peerTrusted(addr, trustedProxies) {
 		return peer
 	}
-	if peerTrusted(addr, trustedProxies) {
-		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-			first := strings.TrimSpace(strings.Split(forwarded, ",")[0])
-			if _, err := netip.ParseAddr(first); err == nil {
-				return first
+	hops := forwardedHops(r)
+	for i := len(hops) - 1; i >= 0; i-- {
+		hop, err := netip.ParseAddr(hops[i])
+		if err != nil {
+			return peer
+		}
+		if peerTrusted(hop, trustedProxies) {
+			continue
+		}
+		return hop.String()
+	}
+	return peer
+}
+
+func forwardedHops(r *http.Request) []string {
+	var hops []string
+	for _, header := range r.Header.Values("X-Forwarded-For") {
+		for _, hop := range strings.Split(header, ",") {
+			if hop = strings.TrimSpace(hop); hop != "" {
+				hops = append(hops, hop)
 			}
 		}
 	}
-	return peer
+	return hops
 }
 
 func peerTrusted(addr netip.Addr, trustedProxies []string) bool {

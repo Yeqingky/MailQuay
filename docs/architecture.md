@@ -639,6 +639,7 @@ HTTP 层注意:
 - Cookie 设置 `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`. `Secure` 在生产 HTTPS 下强制; 本地开发只允许 loopback 上的 HTTP 例外.
 - 会话默认 7 天, 活动时滑动续期; 会话 Cookie 与 CSRF Cookie 同步续期; 修改密码撤销全部会话.
 - 登录和 OAuth 回调按 IP 和账号限流.
+- 登录限流的客户端 IP 取 `X-Forwarded-For` 中最右侧不属于可信代理的跳; 限流表按窗口淘汰空闲键, 键数有上限.
 
 ### 8.2 传输安全提醒
 
