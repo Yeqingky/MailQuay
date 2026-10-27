@@ -78,12 +78,25 @@ func (s *Service) NeedsSetup(ctx context.Context) (bool, error) {
 	return n == 0, nil
 }
 
-// SetupToken returns the one-time token shown at startup.
-func (s *Service) SetupToken() string { return s.setupToken }
+// consumeSetupToken reports whether token matches the one-time setup token and
+// invalidates it in the same critical section, so concurrent setups cannot both
+// pass the check.
+func (s *Service) consumeSetupToken(token string) bool {
+	if strings.TrimSpace(token) == "" {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.setupToken == "" || subtle.ConstantTimeCompare([]byte(token), []byte(s.setupToken)) != 1 {
+		return false
+	}
+	s.setupToken = ""
+	return true
+}
 
 // Setup creates the owner account and a session.
 func (s *Service) Setup(ctx context.Context, token, username, password, userAgent string) (*Session, error) {
-	if strings.TrimSpace(token) == "" || subtle.ConstantTimeCompare([]byte(token), []byte(s.setupToken)) != 1 {
+	if !s.consumeSetupToken(token) {
 		return nil, ErrInvalidSetupToken
 	}
 	needs, err := s.NeedsSetup(ctx)
@@ -111,9 +124,6 @@ func (s *Service) Setup(ctx context.Context, token, username, password, userAgen
 		}
 		return nil, fmt.Errorf("create owner: %w", err)
 	}
-	s.mu.Lock()
-	s.setupToken = ""
-	s.mu.Unlock()
 	return s.createSession(ctx, user, userAgent)
 }
 

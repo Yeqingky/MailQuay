@@ -3,6 +3,8 @@ package auth
 import (
 	"net/http/httptest"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -140,5 +142,40 @@ func TestLimiterRejectsNewKeysAtCapacity(t *testing.T) {
 	}
 	if !l.Allow("ip-0") {
 		t.Fatal("known key rejected while the map is at capacity")
+	}
+}
+
+func TestConsumeSetupTokenSingleUse(t *testing.T) {
+	svc := &Service{setupToken: "one-time"}
+	if svc.consumeSetupToken("wrong") {
+		t.Fatal("wrong token accepted")
+	}
+	if svc.consumeSetupToken("") {
+		t.Fatal("empty token accepted")
+	}
+	if !svc.consumeSetupToken("one-time") {
+		t.Fatal("valid token rejected")
+	}
+	if svc.consumeSetupToken("one-time") {
+		t.Fatal("token accepted twice")
+	}
+}
+
+func TestConsumeSetupTokenConcurrent(t *testing.T) {
+	svc := &Service{setupToken: "one-time"}
+	var wins atomic.Int32
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if svc.consumeSetupToken("one-time") {
+				wins.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	if wins.Load() != 1 {
+		t.Fatalf("token consumed %d times, want 1", wins.Load())
 	}
 }
