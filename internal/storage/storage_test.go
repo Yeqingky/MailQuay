@@ -151,6 +151,9 @@ func TestSHAValidationAndTraversal(t *testing.T) {
 		if _, err := store.ReadText(sha); !errors.Is(err, storage.ErrInvalidSHA) {
 			t.Errorf("ReadText(%q) err = %v", sha, err)
 		}
+		if _, err := store.TextModTime(sha); !errors.Is(err, storage.ErrInvalidSHA) {
+			t.Errorf("TextModTime(%q) err = %v", sha, err)
+		}
 	}
 }
 
@@ -179,6 +182,9 @@ func TestTextCache(t *testing.T) {
 	data, _ = store.ReadText(sha)
 	if string(data) != "updated" {
 		t.Errorf("updated text = %q", data)
+	}
+	if _, err := store.TextModTime(sha); err != nil {
+		t.Errorf("TextModTime: %v", err)
 	}
 	if err := store.DeleteText(sha); err != nil {
 		t.Fatalf("DeleteText: %v", err)

@@ -409,7 +409,11 @@ func (s *Store) ModTime(sha string) (time.Time, error) {
 
 // TextModTime returns the modification time of a text cache entry.
 func (s *Store) TextModTime(sha string) (time.Time, error) {
-	info, err := os.Stat(filepath.Join(s.Root(), "text", sha))
+	path, err := s.textPath(sha)
+	if err != nil {
+		return time.Time{}, err
+	}
+	info, err := os.Stat(path)
 	if err != nil {
 		return time.Time{}, err
 	}
