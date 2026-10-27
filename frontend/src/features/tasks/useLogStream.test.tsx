@@ -46,8 +46,14 @@ class MockEventSource {
   }
 }
 
-function Harness({ onBatch }: { onBatch: (batch: LogStreamBatch) => void }) {
-  const { status, retry } = useLogStream({ enabled: true, cursor: '1-2', onBatch });
+function Harness({
+  onBatch,
+  cursor = '1-2',
+}: {
+  onBatch: (batch: LogStreamBatch) => void;
+  cursor?: string;
+}) {
+  const { status, retry } = useLogStream({ enabled: true, cursor, onBatch });
   return (
     <>
       <span data-testid="status">{status}</span>
@@ -117,6 +123,22 @@ describe('useLogStream', () => {
     fireEvent.click(screen.getByRole('button', { name: 'retry' }));
     expect(MockEventSource.instances).toHaveLength(4);
     expect(currentSource().url).toContain('/logs/stream?after=1-2');
+  });
+
+  it('keeps one connection when the caller advances the cursor', () => {
+    const batches: LogStreamBatch[] = [];
+    const view = render(<Harness onBatch={(batch) => batches.push(batch)} cursor="1-2" />);
+    act(() => currentSource().open());
+    act(() => currentSource().emit(null, [{ id: 3, line: 'first' }], '1-3'));
+
+    // The page writes the new cursor into the query cache after every batch;
+    // that must not tear the connection down.
+    view.rerender(<Harness onBatch={(batch) => batches.push(batch)} cursor="1-3" />);
+    expect(MockEventSource.instances).toHaveLength(1);
+    expect(currentSource().closed).toBe(false);
+
+    act(() => currentSource().emit(null, [{ id: 4, line: 'second' }], '1-4'));
+    expect(batches.map((batch) => batch.cursor)).toEqual(['1-3', '1-4']);
   });
 
   it('ignores frames that are not log batches', () => {

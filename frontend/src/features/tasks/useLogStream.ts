@@ -51,38 +51,50 @@ export function useLogStream({ enabled, cursor, onBatch }: Options): {
   const [status, setStatus] = useState<LogStreamStatus>('connecting');
   const [attempt, setAttempt] = useState(0);
   const batchRef = useRef(onBatch);
+  // The cursor prop only seeds the first connection; every received frame
+  // advances the cursor. Keeping it out of the effect dependencies is what
+  // stops a new connection from opening for each batch.
+  const startCursorRef = useRef(cursor);
+  const lastEventIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    startCursorRef.current = cursor;
+  }, [cursor]);
 
   useEffect(() => {
     batchRef.current = onBatch;
   }, [onBatch]);
 
   useEffect(() => {
-    if (!enabled || !cursor || typeof EventSource === 'undefined') return;
+    if (!enabled || typeof EventSource === 'undefined') return;
+    if (!lastEventIdRef.current) lastEventIdRef.current = startCursorRef.current ?? null;
+    if (!lastEventIdRef.current) return;
     let source: EventSource | null = null;
     let disposed = false;
     let failures = 0;
-    let lastEventId = cursor;
     let reconnectTimer: number | undefined;
 
     const connect = () => {
       if (disposed) return;
+      const cursor = lastEventIdRef.current;
+      if (!cursor) return;
       setStatus(failures === 0 ? 'connecting' : 'retrying');
-      const url = apiUrl(`/logs/stream?after=${encodeURIComponent(lastEventId)}`);
+      const url = apiUrl(`/logs/stream?after=${encodeURIComponent(cursor)}`);
       source = new EventSource(url, { withCredentials: true });
       source.onopen = () => {
         failures = 0;
         setStatus('connected');
       };
       source.onmessage = (event) => {
-        if (event.lastEventId) lastEventId = event.lastEventId;
+        if (event.lastEventId) lastEventIdRef.current = event.lastEventId;
         const entries = parseEntries(event.data);
         if (entries.length === 0) return;
-        batchRef.current({ reset: false, entries, cursor: lastEventId });
+        batchRef.current({ reset: false, entries, cursor: lastEventIdRef.current ?? cursor });
       };
       source.addEventListener('reset', (event) => {
         const frame = event as MessageEvent<string>;
-        if (frame.lastEventId) lastEventId = frame.lastEventId;
-        batchRef.current({ reset: true, entries: [], cursor: lastEventId });
+        if (frame.lastEventId) lastEventIdRef.current = frame.lastEventId;
+        batchRef.current({ reset: true, entries: [], cursor: lastEventIdRef.current ?? cursor });
       });
       source.onerror = () => {
         source?.close();
@@ -106,7 +118,7 @@ export function useLogStream({ enabled, cursor, onBatch }: Options): {
       if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
       source?.close();
     };
-  }, [enabled, cursor, attempt]);
+  }, [enabled, attempt]);
 
   const retry = useCallback(() => setAttempt((value) => value + 1), []);
   return { status, retry };
