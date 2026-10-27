@@ -56,7 +56,7 @@ go run ./cmd/mailquay migrate up
 go run ./cmd/mailquay serve
 ```
 
-默认监听 `:8080`, blob, 正文文本缓存和 Bleve 索引位于 `./data`. 首次启动会在数据目录写入一次性 setup token (`data/setup-token`, 权限 `0600`, 日志只记录路径), 前端 `/setup` 页面需要填写该 token.
+默认监听 `:8080`, blob, 正文文本缓存和 Bleve 索引位于 `./data`. 首次启动会在数据目录写入一次性 setup token (`data/setup-token`, 权限 `0600`, 日志只记录路径), 初始化成功后自动删除该文件, 前端 `/setup` 页面需要填写该 token.
 
 ### 3.2 搜索索引
 
