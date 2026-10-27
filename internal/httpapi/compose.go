@@ -154,8 +154,23 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, mapOutbox(out))
 }
 
+// uploadMemoryLimit keeps multipart parsing in memory up to this size before it
+// spools to temporary files.
+const uploadMemoryLimit = 26 << 20
+
+// multipartOverhead covers boundaries and non-file form fields on top of the
+// configured attachment size when capping the request body.
+const multipartOverhead = 1 << 20
+
 func (s *Server) UploadAttachment(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(26 << 20); err != nil {
+	limit := s.settings.MaxAttachmentBytes()
+	r.Body = http.MaxBytesReader(w, r.Body, limit+multipartOverhead)
+	if err := r.ParseMultipartForm(uploadMemoryLimit); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			s.error(w, r, http.StatusRequestEntityTooLarge, "attachment_too_large", "Attachment exceeds the configured limit.")
+			return
+		}
 		s.error(w, r, http.StatusBadRequest, "invalid_upload", "Malformed multipart upload.")
 		return
 	}
@@ -165,7 +180,6 @@ func (s *Server) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
-	limit := s.settings.MaxAttachmentBytes()
 	data, err := io.ReadAll(io.LimitReader(file, limit+1))
 	if err != nil || int64(len(data)) > limit {
 		s.error(w, r, http.StatusRequestEntityTooLarge, "attachment_too_large", "Attachment exceeds the configured limit.")

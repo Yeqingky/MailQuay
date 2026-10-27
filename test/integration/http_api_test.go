@@ -257,6 +257,30 @@ func TestHTTPAuthAndAccountFlow(t *testing.T) {
 	if settings["sendRetryLimit"] != retryBefore {
 		t.Fatalf("rejected patch changed sendRetryLimit: %v -> %v", retryBefore, settings["sendRetryLimit"])
 	}
+	// Oversized uploads must be cut off before the multipart parser buffers them.
+	resp = sendJSON(t, client, http.MethodPatch, base+"/settings", map[string]any{"maxAttachmentBytes": 1 << 20}, csrf)
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("attachment limit patch %d: %s", resp.StatusCode, body)
+	}
+	resp.Body.Close()
+	upload := newBigMultipartBody(64 << 20)
+	uploadReq, err := http.NewRequest(http.MethodPost, base+"/attachments", upload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	uploadReq.Header.Set("Content-Type", "multipart/form-data; boundary="+uploadBoundary)
+	uploadReq.Header.Set("X-CSRF-Token", csrf)
+	resp, err = client.Do(uploadReq)
+	if err == nil {
+		if resp.StatusCode != http.StatusRequestEntityTooLarge {
+			t.Fatalf("oversized upload status = %d, want 413", resp.StatusCode)
+		}
+		resp.Body.Close()
+	}
+	if upload.read >= 8<<20 {
+		t.Fatalf("server consumed %d bytes of a rejected 64 MiB upload", upload.read)
+	}
 	resp = sendJSON(t, client, http.MethodPost, base+"/accounts", map[string]any{
 		"name": "Test", "email": "api@example.com", "username": "api", "authType": "password",
 		"password": "secret", "receiveProtocol": "imap", "imapAddr": "127.0.0.1:143",
@@ -403,4 +427,57 @@ func expireCookie(t *testing.T, jar http.CookieJar, serverURL, name string) {
 			t.Fatalf("cookie %s still present", name)
 		}
 	}
+}
+
+const uploadBoundary = "mailquaytestboundary"
+
+type bigMultipartBody struct {
+	read   int64
+	prefix []byte
+	data   int64
+	suffix []byte
+	stage  int
+}
+
+func newBigMultipartBody(size int64) *bigMultipartBody {
+	prefix := "--" + uploadBoundary + "\r\n" +
+		"Content-Disposition: form-data; name=\"file\"; filename=\"big.bin\"\r\n" +
+		"Content-Type: application/octet-stream\r\n\r\n"
+	return &bigMultipartBody{
+		prefix: []byte(prefix),
+		data:   size,
+		suffix: []byte("\r\n--" + uploadBoundary + "--\r\n"),
+	}
+}
+
+func (b *bigMultipartBody) Read(p []byte) (int, error) {
+	if b.stage == 0 {
+		n := copy(p, b.prefix)
+		b.prefix = b.prefix[n:]
+		b.read += int64(n)
+		if len(b.prefix) == 0 {
+			b.stage = 1
+		}
+		return n, nil
+	}
+	if b.stage == 1 {
+		if b.data == 0 {
+			b.stage = 2
+		} else {
+			if int64(len(p)) > b.data {
+				p = p[:b.data]
+			}
+			clear(p)
+			b.data -= int64(len(p))
+			b.read += int64(len(p))
+			return len(p), nil
+		}
+	}
+	if len(b.suffix) == 0 {
+		return 0, io.EOF
+	}
+	n := copy(p, b.suffix)
+	b.suffix = b.suffix[n:]
+	b.read += int64(n)
+	return n, nil
 }
