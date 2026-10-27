@@ -529,8 +529,8 @@ frontend/
 | `DELETE` | `/accounts/{id}` | 软删除账号并异步清理; 默认保留标记邮件 |
 | `POST` | `/accounts/{id}/test` | 测试账号保存的 IMAP/POP3 和 SMTP 连接 |
 | `POST` | `/accounts/{id}/sync` | 触发立即同步 |
-| `GET` | `/oauth/{provider}/start` | 生成授权 URL 并重定向 |
-| `GET` | `/oauth/{provider}/callback` | 授权回调, 保存账号的 OAuth token |
+| `GET` | `/oauth/{provider}/start` | 生成授权 URL 并重定向; 需要登录会话 |
+| `GET` | `/oauth/{provider}/callback` | 授权回调, 保存账号的 OAuth token; 无需会话 |
 
 ### 6.3 文件夹与邮件
 

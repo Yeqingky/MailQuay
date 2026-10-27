@@ -154,7 +154,7 @@ func containsString(values []string, want string) bool {
 func (s *Server) sessionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := apiPath(r.URL.Path)
-		public := path == "/auth/setup" || path == "/auth/login" || strings.HasPrefix(path, "/oauth/")
+		public := path == "/auth/setup" || path == "/auth/login" || isOAuthCallbackPath(path)
 		var sess *auth.Session
 		if cookie, err := r.Cookie(auth.SessionCookie); err == nil && cookie.Value != "" {
 			if loaded, err := s.auth.Authenticate(r.Context(), cookie.Value); err == nil {
@@ -207,7 +207,7 @@ func (s *Server) csrfMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		path := apiPath(r.URL.Path)
-		if path == "/auth/setup" || path == "/auth/login" || strings.HasPrefix(path, "/oauth/") {
+		if path == "/auth/setup" || path == "/auth/login" || isOAuthCallbackPath(path) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -247,4 +247,17 @@ func sameOrigin(r *http.Request, corsOrigins []string) bool {
 
 func apiPath(path string) string {
 	return strings.TrimPrefix(path, "/api/v1")
+}
+
+// isOAuthCallbackPath reports whether path is a provider callback route.
+// Only the callback is public: the provider redirects the browser there without
+// a MailQuay session, while start must run inside an authenticated session so
+// nobody can mint a state bound to an arbitrary account id.
+func isOAuthCallbackPath(path string) bool {
+	rest, ok := strings.CutPrefix(path, "/oauth/")
+	if !ok {
+		return false
+	}
+	provider, ok := strings.CutSuffix(rest, "/callback")
+	return ok && provider != "" && !strings.Contains(provider, "/")
 }

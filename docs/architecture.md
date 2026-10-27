@@ -135,8 +135,8 @@ flowchart TB
 
 OAuth2 流程:
 
-1. 前端打开 `GET /api/v1/oauth/{provider}/start`, 后端生成 `state` 和 PKCE verifier, 存入短期表, 重定向到服务商.
-2. 回调 `GET /api/v1/oauth/{provider}/callback` 校验 `state`, 用授权码换取 refresh token 和 access token.
+1. 前端打开 `GET /api/v1/oauth/{provider}/start`, 该接口要求已登录会话, 后端生成 `state` 和 PKCE verifier, 存入短期表, 重定向到服务商.
+2. 回调 `GET /api/v1/oauth/{provider}/callback` 是唯一无需会话的 OAuth 接口, 校验 `state`, 用授权码换取 refresh token 和 access token.
 3. refresh token 写入账号的 `oauth_refresh_enc` 并加密; access token 只放在内存, 过期前刷新.
 4. IMAP, POP3 和 SMTP 按服务商能力使用 XOAUTH2, 每次连接前取有效 access token. POP3 的 OAuth 支持取决于服务商, 不支持时回退到应用专用密码.
 

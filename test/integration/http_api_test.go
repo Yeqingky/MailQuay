@@ -70,6 +70,41 @@ func TestHTTPAuthAndAccountFlow(t *testing.T) {
 	if user == nil || user["username"] != "owner" {
 		t.Fatalf("me = %+v", me)
 	}
+	// OAuth start must run inside an authenticated session; only the provider
+	// callback is public.
+	anonymous := &http.Client{Timeout: 10 * time.Second}
+	startURL := base + "/oauth/google/start?accountId=11111111-1111-1111-1111-111111111111"
+	resp, err = anonymous.Get(startURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("anonymous oauth start status = %d, want 401", resp.StatusCode)
+	}
+	noRedirect := &http.Client{
+		Jar:     jar,
+		Timeout: 10 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	resp, err = noRedirect.Get(startURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("authenticated oauth start status = %d, want 302", resp.StatusCode)
+	}
+	resp, err = anonymous.Get(base + "/oauth/google/callback?code=code&state=state")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode == http.StatusUnauthorized {
+		t.Fatal("oauth callback must stay reachable without a session")
+	}
 	settings := getJSON(t, client, base+"/settings")
 	if settings["sendRetryLimit"] != float64(3) {
 		t.Fatalf("default retry limit = %v", settings["sendRetryLimit"])
