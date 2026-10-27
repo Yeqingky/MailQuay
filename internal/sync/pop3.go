@@ -8,13 +8,13 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/mailquay/mailquay/internal/account"
-	"github.com/mailquay/mailquay/internal/mailbox"
-	"github.com/mailquay/mailquay/internal/message"
-	"github.com/mailquay/mailquay/internal/mime"
-	"github.com/mailquay/mailquay/internal/platform"
-	"github.com/mailquay/mailquay/internal/pop3client"
-	"github.com/mailquay/mailquay/internal/store/sqlcgen"
+	"github.com/Yeqingky/MailQuay/internal/account"
+	"github.com/Yeqingky/MailQuay/internal/mailbox"
+	"github.com/Yeqingky/MailQuay/internal/message"
+	"github.com/Yeqingky/MailQuay/internal/mime"
+	"github.com/Yeqingky/MailQuay/internal/platform"
+	"github.com/Yeqingky/MailQuay/internal/pop3client"
+	"github.com/Yeqingky/MailQuay/internal/store/sqlcgen"
 )
 
 func (s *Service) pop3Config(acct sqlcgen.Account, creds account.Credentials) pop3client.Config {

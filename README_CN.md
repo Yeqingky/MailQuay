@@ -82,14 +82,13 @@ flowchart LR
 | 路由 | `react-router` | 单个 `index.html` 上的客户端路由, 深链接回落到应用壳. |
 | 服务端状态 | TanStack Query v5 | 缓存, 乐观更新, 由 SSE 驱动失效. |
 | UI | Tailwind CSS v4 + shadcn/ui | 基于 Radix 的可访问组件, 样式完全可控. |
-| 实时推送 | Server-Sent Events | 单向推送, 自动重连, 直接复用 Cookie 认证. |
+| 实时推送 | Server-Sent Events | 单向推送, 最多重连 3 次, 直接复用 Cookie 认证. |
 
 ## 仓库
 
 | 仓库 | 内容 |
 | --- | --- |
-| [`MailQuay`](https://github.com/MailQuay/MailQuay) | Go 后端, 数据库迁移, 部署文件, API 合同, 开发文档. |
-| [`frontend`](https://github.com/MailQuay/frontend) | React 单页前端及其容器镜像. |
+| [`MailQuay`](https://github.com/Yeqingky/MailQuay) | Go 后端, 数据库迁移, 部署文件, API 合同, `frontend/` 下的 React 单页前端, 开发文档. |
 
 ## 文档
 

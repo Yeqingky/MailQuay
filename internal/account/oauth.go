@@ -13,7 +13,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/mailquay/mailquay/internal/store/sqlcgen"
+	"github.com/Yeqingky/MailQuay/internal/store/sqlcgen"
 )
 
 type cachedToken struct {

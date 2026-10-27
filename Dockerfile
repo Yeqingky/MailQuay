@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
 
-# Frontend built from the sibling checkout. BuildKit resolves it through the
-# named build context `frontend`; Compose maps it to ../frontend, and a manual
-# build passes --build-context frontend=../frontend. The `full-prebuilt` target
+# Frontend built from the in-repo checkout. BuildKit resolves it through the
+# named build context `frontend`; Compose maps it to ./frontend, and a manual
+# build passes --build-context frontend=./frontend. The `full-prebuilt` target
 # instead expects a context that already contains dist/, which the release
-# workflow feeds from the frontend tag build.
+# workflow feeds from the frontend build job.
 FROM --platform=$BUILDPLATFORM node:24-bookworm-slim AS web
 WORKDIR /app
 RUN corepack enable

@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/mailquay/mailquay/internal/storage"
-	"github.com/mailquay/mailquay/internal/store"
+	"github.com/Yeqingky/MailQuay/internal/storage"
+	"github.com/Yeqingky/MailQuay/internal/store"
 )
 
 func gcBlobs(ctx context.Context, st *store.Store, blobs *storage.Store, logger *slog.Logger) {

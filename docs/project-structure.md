@@ -1,20 +1,20 @@
 # 项目结构
 
-本文定义两个仓库的目录布局, 模块职责, 数据模型, HTTP API 和前端布局. 设计理由见 [architecture.md](architecture.md), 开发流程见 [development.md](development.md).
+本文定义仓库与 `frontend/` 子目录的布局, 模块职责, 数据模型, HTTP API 和前端布局. 设计理由见 [architecture.md](architecture.md), 开发流程见 [development.md](development.md).
 
-## 1. 仓库划分
+## 1. 仓库与子目录
 
-| 仓库 | 职责 | 产物 |
+| 部分 | 职责 | 产物 |
 | --- | --- | --- |
-| `MailQuay` | Go 后端, 数据库迁移, API 合同, 部署文件, 文档 | `ghcr.io/mailquay/mailquay` |
-| `frontend` | React 单页前端, 静态资源 | Cloudflare Pages 等静态部署, 或由含前端版后端内嵌 |
+| 仓库根目录 | Go 后端, 数据库迁移, API 合同, 部署文件, 文档 | `ghcr.io/yeqingky/mailquay` |
+| `frontend/` | React 单页前端, 静态资源 | Cloudflare Pages 等静态部署, 或由含前端版后端内嵌 |
 
-前端仓库不保存后端文档. 两份仓库并列检出即可本地联调:
+前端源码位于后端仓库的 `frontend/` 子目录, 一次检出即可本地联调:
 
 ```
 GitHub-MailQuay/
-├── MailQuay/
-└── frontend/
+└── MailQuay/
+    └── frontend/
 ```
 
 ## 2. MailQuay 目录
@@ -41,6 +41,7 @@ MailQuay/
 ├── cmd/
 │   └── mailquay/
 │       └── main.go                  # serve, migrate, search, healthcheck 子命令
+├── frontend/                        # React 单页前端, 独立 pnpm 工程
 ├── internal/
 │   ├── app/                         # 依赖装配, 启动顺序, 优雅退出
 │   ├── config/                      # 环境变量解析与校验
@@ -132,7 +133,7 @@ MailQuay/
 
 ## 3. frontend 目录
 
-frontend 仓库的目标布局如下.
+`frontend/` 目录的布局如下.
 
 ```
 frontend/
@@ -237,7 +238,7 @@ frontend/
 | `features/settings` | 设置分组, 表单控件, 即时保存 |
 | `components/layout` | `Sidebar`, `TopBar`, `UserMenu`, `SettingsSidebar`, 布局原子 |
 | `lib/api` | 生成的类型与客户端, 错误归一化 |
-| `lib/events` | SSE 连接, 重连, 事件到 Query 缓存的映射 |
+| `lib/events` | SSE 连接, 重连上限, 连接状态, 事件到 Query 缓存的映射 |
 | `stores` | 只放 UI 状态, 不放服务端数据 |
 
 ## 4. 前端布局
@@ -261,7 +262,7 @@ frontend/
 │ ▸ me@example.com  │                       │                               │
 │ ▸ other@example   │                       │                               │
 │                  │                       │                               │
-│ 同步状态 / 设置   │                       │                               │
+│ SSE 连接状态     │                       │                               │
 └──────────────────┴───────────────────────┴───────────────────────────────┘
 ```
 
@@ -285,7 +286,7 @@ frontend/
 3. 邮箱账号列表: 每个账号一行, 显示邮箱和未读计数; 默认折叠, 点击展开. 同步失败时在未读数右侧显示红色三角形按钮, 点击打开错误浮层, 不触发展开或折叠.
 4. 展开账号后重复显示系统文件夹: 收件箱, 未读, 已发送, 草稿, 已删除, 其他.
 5. 不在系统文件夹中的 Junk, Archive, 服务商标签和自定义文件夹, 全部放入该账号的"其他"; 其他在该组最下面, 默认折叠.
-6. 底部: 同步状态和设置入口; 不放主题和登录用户菜单.
+6. 底部: SSE 连接状态, 已连接为绿色, 重试中为黄色, 连接失败为红色; 不放设置入口, 主题和登录用户菜单.
 
 收藏夹规则:
 

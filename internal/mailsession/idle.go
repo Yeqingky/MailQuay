@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/Yeqingky/MailQuay/internal/imapclient"
 	"github.com/google/uuid"
-	"github.com/mailquay/mailquay/internal/imapclient"
 )
 
 // ErrIdleUnsupported reports that the server does not advertise IDLE.

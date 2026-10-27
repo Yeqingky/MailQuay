@@ -3,8 +3,8 @@ package httpapi
 import (
 	"testing"
 
-	"github.com/mailquay/mailquay/internal/httpapi/oapi"
-	"github.com/mailquay/mailquay/internal/store/sqlcgen"
+	"github.com/Yeqingky/MailQuay/internal/httpapi/oapi"
+	"github.com/Yeqingky/MailQuay/internal/store/sqlcgen"
 )
 
 func TestMapAccountSpecialFolders(t *testing.T) {

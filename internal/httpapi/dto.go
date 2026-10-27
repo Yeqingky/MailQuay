@@ -9,9 +9,9 @@ import (
 	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
-	"github.com/mailquay/mailquay/internal/httpapi/oapi"
-	"github.com/mailquay/mailquay/internal/mailbox"
-	"github.com/mailquay/mailquay/internal/store/sqlcgen"
+	"github.com/Yeqingky/MailQuay/internal/httpapi/oapi"
+	"github.com/Yeqingky/MailQuay/internal/mailbox"
+	"github.com/Yeqingky/MailQuay/internal/store/sqlcgen"
 )
 
 func mapUser(u sqlcgen.User) oapi.User {

@@ -13,11 +13,11 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/mailquay/mailquay/internal/imapclient"
-	"github.com/mailquay/mailquay/internal/message"
-	"github.com/mailquay/mailquay/internal/platform"
-	"github.com/mailquay/mailquay/internal/smtpclient"
-	"github.com/mailquay/mailquay/internal/store/sqlcgen"
+	"github.com/Yeqingky/MailQuay/internal/imapclient"
+	"github.com/Yeqingky/MailQuay/internal/message"
+	"github.com/Yeqingky/MailQuay/internal/platform"
+	"github.com/Yeqingky/MailQuay/internal/smtpclient"
+	"github.com/Yeqingky/MailQuay/internal/store/sqlcgen"
 )
 
 const outboxLease = 5 * time.Minute

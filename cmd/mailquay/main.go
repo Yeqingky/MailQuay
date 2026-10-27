@@ -16,11 +16,11 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/mailquay/mailquay/internal/app"
-	"github.com/mailquay/mailquay/internal/config"
-	"github.com/mailquay/mailquay/internal/imapclient"
-	"github.com/mailquay/mailquay/internal/platform"
-	"github.com/mailquay/mailquay/internal/store"
+	"github.com/Yeqingky/MailQuay/internal/app"
+	"github.com/Yeqingky/MailQuay/internal/config"
+	"github.com/Yeqingky/MailQuay/internal/imapclient"
+	"github.com/Yeqingky/MailQuay/internal/platform"
+	"github.com/Yeqingky/MailQuay/internal/store"
 )
 
 var (

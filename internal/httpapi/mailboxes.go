@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/mailquay/mailquay/internal/httpapi/oapi"
-	"github.com/mailquay/mailquay/internal/mailbox"
+	"github.com/Yeqingky/MailQuay/internal/httpapi/oapi"
+	"github.com/Yeqingky/MailQuay/internal/mailbox"
 )
 
 func (s *Server) GetMailboxTree(w http.ResponseWriter, r *http.Request) {

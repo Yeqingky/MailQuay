@@ -16,10 +16,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/mailquay/mailquay/internal/platform"
-	"github.com/mailquay/mailquay/internal/settings"
-	"github.com/mailquay/mailquay/internal/store"
-	"github.com/mailquay/mailquay/internal/store/sqlcgen"
+	"github.com/Yeqingky/MailQuay/internal/platform"
+	"github.com/Yeqingky/MailQuay/internal/settings"
+	"github.com/Yeqingky/MailQuay/internal/store"
+	"github.com/Yeqingky/MailQuay/internal/store/sqlcgen"
 )
 
 var (

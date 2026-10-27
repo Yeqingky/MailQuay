@@ -12,12 +12,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/mailquay/mailquay/internal/events"
-	"github.com/mailquay/mailquay/internal/mime"
-	"github.com/mailquay/mailquay/internal/platform"
-	"github.com/mailquay/mailquay/internal/storage"
-	"github.com/mailquay/mailquay/internal/store"
-	"github.com/mailquay/mailquay/internal/store/sqlcgen"
+	"github.com/Yeqingky/MailQuay/internal/events"
+	"github.com/Yeqingky/MailQuay/internal/mime"
+	"github.com/Yeqingky/MailQuay/internal/platform"
+	"github.com/Yeqingky/MailQuay/internal/storage"
+	"github.com/Yeqingky/MailQuay/internal/store"
+	"github.com/Yeqingky/MailQuay/internal/store/sqlcgen"
 )
 
 var (

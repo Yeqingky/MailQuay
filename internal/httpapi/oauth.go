@@ -15,14 +15,14 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/mailquay/mailquay/internal/account"
-	"github.com/mailquay/mailquay/internal/auth"
-	"github.com/mailquay/mailquay/internal/config"
-	"github.com/mailquay/mailquay/internal/crypto"
-	"github.com/mailquay/mailquay/internal/httpapi/oapi"
-	"github.com/mailquay/mailquay/internal/settings"
-	"github.com/mailquay/mailquay/internal/store"
-	"github.com/mailquay/mailquay/internal/store/sqlcgen"
+	"github.com/Yeqingky/MailQuay/internal/account"
+	"github.com/Yeqingky/MailQuay/internal/auth"
+	"github.com/Yeqingky/MailQuay/internal/config"
+	"github.com/Yeqingky/MailQuay/internal/crypto"
+	"github.com/Yeqingky/MailQuay/internal/httpapi/oapi"
+	"github.com/Yeqingky/MailQuay/internal/settings"
+	"github.com/Yeqingky/MailQuay/internal/store"
+	"github.com/Yeqingky/MailQuay/internal/store/sqlcgen"
 )
 
 // OAuth implements the authorization-code + PKCE flow for mail providers.

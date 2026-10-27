@@ -12,17 +12,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/mailquay/mailquay/internal/crypto"
-	"github.com/mailquay/mailquay/internal/imapclient"
-	"github.com/mailquay/mailquay/internal/mailbox"
-	"github.com/mailquay/mailquay/internal/mailsession"
-	"github.com/mailquay/mailquay/internal/netpace"
-	"github.com/mailquay/mailquay/internal/platform"
-	"github.com/mailquay/mailquay/internal/pop3client"
-	"github.com/mailquay/mailquay/internal/settings"
-	"github.com/mailquay/mailquay/internal/smtpclient"
-	"github.com/mailquay/mailquay/internal/store"
-	"github.com/mailquay/mailquay/internal/store/sqlcgen"
+	"github.com/Yeqingky/MailQuay/internal/crypto"
+	"github.com/Yeqingky/MailQuay/internal/imapclient"
+	"github.com/Yeqingky/MailQuay/internal/mailbox"
+	"github.com/Yeqingky/MailQuay/internal/mailsession"
+	"github.com/Yeqingky/MailQuay/internal/netpace"
+	"github.com/Yeqingky/MailQuay/internal/platform"
+	"github.com/Yeqingky/MailQuay/internal/pop3client"
+	"github.com/Yeqingky/MailQuay/internal/settings"
+	"github.com/Yeqingky/MailQuay/internal/smtpclient"
+	"github.com/Yeqingky/MailQuay/internal/store"
+	"github.com/Yeqingky/MailQuay/internal/store/sqlcgen"
 )
 
 // ErrNotFound is returned when an account does not exist.

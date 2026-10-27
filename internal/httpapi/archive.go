@@ -9,10 +9,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/mailquay/mailquay/internal/httpapi/oapi"
-	"github.com/mailquay/mailquay/internal/message"
-	mailmime "github.com/mailquay/mailquay/internal/mime"
-	"github.com/mailquay/mailquay/internal/store/sqlcgen"
+	"github.com/Yeqingky/MailQuay/internal/httpapi/oapi"
+	"github.com/Yeqingky/MailQuay/internal/message"
+	mailmime "github.com/Yeqingky/MailQuay/internal/mime"
+	"github.com/Yeqingky/MailQuay/internal/store/sqlcgen"
 )
 
 func (s *Server) ListArchives(w http.ResponseWriter, r *http.Request, params oapi.ListArchivesParams) {

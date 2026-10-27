@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	mailmime "github.com/mailquay/mailquay/internal/mime"
+	mailmime "github.com/Yeqingky/MailQuay/internal/mime"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )

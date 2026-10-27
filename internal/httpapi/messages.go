@@ -11,10 +11,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/mailquay/mailquay/internal/httpapi/oapi"
-	"github.com/mailquay/mailquay/internal/message"
-	"github.com/mailquay/mailquay/internal/netpace"
-	"github.com/mailquay/mailquay/internal/store/sqlcgen"
+	"github.com/Yeqingky/MailQuay/internal/httpapi/oapi"
+	"github.com/Yeqingky/MailQuay/internal/message"
+	"github.com/Yeqingky/MailQuay/internal/netpace"
+	"github.com/Yeqingky/MailQuay/internal/store/sqlcgen"
 )
 
 func (s *Server) ListMessages(w http.ResponseWriter, r *http.Request, params oapi.ListMessagesParams) {

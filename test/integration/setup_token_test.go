@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mailquay/mailquay/internal/app"
-	"github.com/mailquay/mailquay/internal/config"
-	"github.com/mailquay/mailquay/internal/store"
+	"github.com/Yeqingky/MailQuay/internal/app"
+	"github.com/Yeqingky/MailQuay/internal/config"
+	"github.com/Yeqingky/MailQuay/internal/store"
 )
 
 func TestSetupRemovesGeneratedTokenFile(t *testing.T) {

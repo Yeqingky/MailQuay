@@ -9,11 +9,11 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/mailquay/mailquay/internal/imapclient"
-	"github.com/mailquay/mailquay/internal/mailsession"
-	"github.com/mailquay/mailquay/internal/platform"
-	"github.com/mailquay/mailquay/internal/settings"
-	"github.com/mailquay/mailquay/internal/store/sqlcgen"
+	"github.com/Yeqingky/MailQuay/internal/imapclient"
+	"github.com/Yeqingky/MailQuay/internal/mailsession"
+	"github.com/Yeqingky/MailQuay/internal/platform"
+	"github.com/Yeqingky/MailQuay/internal/settings"
+	"github.com/Yeqingky/MailQuay/internal/store/sqlcgen"
 )
 
 // opsWait bounds how long the background ops loop waits for the account

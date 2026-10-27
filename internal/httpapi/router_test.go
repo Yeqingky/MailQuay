@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mailquay/mailquay/internal/config"
+	"github.com/Yeqingky/MailQuay/internal/config"
 )
 
 func TestSecurityHeadersAllowSandboxedSrcdoc(t *testing.T) {

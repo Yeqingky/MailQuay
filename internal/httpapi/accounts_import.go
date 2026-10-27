@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mailquay/mailquay/internal/account"
-	"github.com/mailquay/mailquay/internal/emclient"
-	"github.com/mailquay/mailquay/internal/httpapi/oapi"
+	"github.com/Yeqingky/MailQuay/internal/account"
+	"github.com/Yeqingky/MailQuay/internal/emclient"
+	"github.com/Yeqingky/MailQuay/internal/httpapi/oapi"
 )
 
 const (

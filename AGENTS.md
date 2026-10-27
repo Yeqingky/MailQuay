@@ -1,6 +1,6 @@
 # AGENTS.md
 
-本文件约束 MailQuay 仓库以及同级 `frontend` 仓库的开发工作. 更具体的子目录规则优先于本文件.
+本文件约束 MailQuay 仓库及其 `frontend/` 目录的开发工作. 更具体的子目录规则优先于本文件.
 
 ## 1. 开始前
 
@@ -185,7 +185,7 @@ pnpm generate:api
 - 主题必须在首屏渲染前从本地 UI 状态应用, 由 `frontend/public/theme-init.js` 在 `<head>` 同步执行; CSP 的 `script-src 'self'` 禁止内联脚本, 暗色模式刷新不得先闪亮色.
 - 需要滚动的浮层和面板不使用浏览器默认滚动条: 统一使用 `components/ui/scroll-area`, 隐藏原生滚动条, 用自绘的 4px 圆角细条显示位置, 颜色取主题 token, 悬停或滚动时显示, 静止后淡出; 下拉选择使用同一细条; 滚轮, 触控和键盘滚动保持可用.
 - 交互元素必须具备可访问名称和键盘操作路径.
-- 侧边栏使用可拖动宽度的左栏: 默认 `232px`, 最小 `180px`, 没有品牌标题, 全局视图常驻显示, 默认折叠的邮箱账号列表, 展开账号后的"其他", 激活态 `bg-accent`, 移动端 Sheet 抽屉; 左下角只显示同步状态, 设置只能从右上角账号菜单进入.
+- 侧边栏使用可拖动宽度的左栏: 默认 `232px`, 最小 `180px`, 没有品牌标题, 全局视图常驻显示, 默认折叠的邮箱账号列表, 展开账号后的"其他", 激活态 `bg-accent`, 移动端 Sheet 抽屉; 左下角只显示 SSE 连接状态, 设置只能从右上角账号菜单进入.
 - 侧边栏, 邮件列表和阅读器三段都可通过竖直分隔条调整宽度; 最小宽度分别为 `180px`, `224px`, `360px`, 拖动时不得挤压其他段低于最小值, 宽度持久化在本地 UI 状态.
 - 顶栏只覆盖内容区: 左侧写邮件; 右侧搜索, 刷新, 明暗切换和登录用户头像; 侧边栏从顶部到底部独立. 任务中心页面不显示写邮件按钮和搜索入口.
 - 顶栏刷新向服务端发起拉取, 不重新请求已缓存的客户端数据: 全局视图触发所有账号同步, 单个文件夹触发所属账号同步, 任务中心只重新读取任务列表.
@@ -215,6 +215,7 @@ pnpm generate:api
 - `prependNewMessages` 默认为开启: 新邮件按当前排序插入列表, 不整表刷新; 关闭时改为显示可点击的新邮件提示, 点击后再合并.
 - 列表插入和重排必须做滚动锚点补偿, 用户不在顶部时不得因新邮件跳回顶部, 选中状态不受影响.
 - SSE 重连必须使用 `lastEventId` 补发遗漏事件并重新校准当前列表; 列表插入按邮件 ID 去重.
+- SSE 连续失败 3 次后停止重连并显示连接失败, 不实现 HTTP 轮询兜底; 左下角按已连接(绿色), 重试中(黄色), 连接失败(红色) 显示连接状态.
 - 不引入第二套组件库, 新组件优先放到 `components/ui` 或对应 feature.
 
 ## 7. 测试
@@ -246,12 +247,12 @@ pnpm generate:api
 - 使用 Conventional Commits: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `ci`, `chore`.
 - 不提交 `.env`, 数据库文件, blob, 构建产物, 真实凭据或测试邮箱数据.
 - 不执行 `git reset --hard`, `git clean -fd` 或强推, 除非用户明确要求.
-- 发布只走 GitHub Actions; 前端和后端使用同一版本号, 各自标签生成 Release, 多平台二进制和 Docker 镜像.
+- 发布只走 GitHub Actions; 前端和后端同仓库同版本号, 由同一个 tag 生成 Release, 多平台二进制和 Docker 镜像.
 - 后端必须提供 `mailquay` (含前端) 和 `mailquay-core` (仅 API) 两种构建; 含前端版在编译期嵌入前端, 不得用运行时开关伪装.
-- 后端发布在 `.github/workflows/release.yml` 内先按同名 tag 构建一次前端, 再并行编译 core 与 full; 全部成功后才创建 Release, 不维护单独的前端版本文件.
-- 后端 PR 和 `main` 的 CI 直接克隆前端仓库 `main` 最新提交验证内嵌构建, 不要求前端标签存在.
+- 后端发布在 `.github/workflows/release.yml` 内先构建 `frontend/` 一次, 再并行编译 core 与 full; 全部成功后才创建 Release, 不维护单独的前端版本文件.
+- 后端 PR 和 `main` 的 CI 在仓库内构建 `frontend/`, 验证内嵌构建, 不依赖任何外部前端仓库.
 - CI 在 `main` 提交和同仓库 PR 上推送 commit 级镜像 `<sha7>` 与 `<sha7>-core`; fork PR 只构建不推送; `latest` 只在标签发布时更新.
 - 后端二进制覆盖 linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64, windows/arm64; Docker 只做 linux/amd64 和 linux/arm64.
 - 代码和产物文件名使用 `darwin`, 用户界面和发布说明写 `macOS`; 不手工创建 Release 绕过工作流.
 - 工作流的每个 job 必须设置 `timeout-minutes`; 联网步骤必须使用命令级 `timeout` 并最多重试 3 次; 平台构建矩阵使用 `fail-fast: false`.
-- Docker 镜像统一发布到 `ghcr.io/mailquay/mailquay`: 含前端版使用 `vX.Y.Z`, `latest` 和 7 位短提交哈希标签; 只含后端版在标签末尾追加 `-core`.
+- Docker 镜像统一发布到 `ghcr.io/yeqingky/mailquay`: 含前端版使用 `vX.Y.Z`, `latest` 和 7 位短提交哈希标签; 只含后端版在标签末尾追加 `-core`.

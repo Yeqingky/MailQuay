@@ -11,8 +11,8 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 
-	"github.com/mailquay/mailquay/internal/store/sqlcgen"
-	"github.com/mailquay/mailquay/migrations"
+	"github.com/Yeqingky/MailQuay/internal/store/sqlcgen"
+	"github.com/Yeqingky/MailQuay/migrations"
 )
 
 // Store owns the connection pool and generated queries.

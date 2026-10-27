@@ -13,10 +13,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/mailquay/mailquay/internal/auth"
-	"github.com/mailquay/mailquay/internal/events"
-	"github.com/mailquay/mailquay/internal/httpapi/oapi"
-	"github.com/mailquay/mailquay/internal/webassets"
+	"github.com/Yeqingky/MailQuay/internal/auth"
+	"github.com/Yeqingky/MailQuay/internal/events"
+	"github.com/Yeqingky/MailQuay/internal/httpapi/oapi"
+	"github.com/Yeqingky/MailQuay/internal/webassets"
 )
 
 type requestIDKeyType int

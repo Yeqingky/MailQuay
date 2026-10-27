@@ -1,4 +1,4 @@
-module github.com/mailquay/mailquay
+module github.com/Yeqingky/MailQuay
 
 go 1.27.3
 

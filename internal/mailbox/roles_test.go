@@ -3,7 +3,7 @@ package mailbox
 import (
 	"testing"
 
-	"github.com/mailquay/mailquay/internal/imapclient"
+	"github.com/Yeqingky/MailQuay/internal/imapclient"
 )
 
 func roleStrings(roles []FolderRole) []string {

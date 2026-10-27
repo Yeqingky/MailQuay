@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/mailquay/mailquay/internal/compose"
-	"github.com/mailquay/mailquay/internal/httpapi/oapi"
+	"github.com/Yeqingky/MailQuay/internal/compose"
+	"github.com/Yeqingky/MailQuay/internal/httpapi/oapi"
 )
 
 func (s *Server) ListDrafts(w http.ResponseWriter, r *http.Request, params oapi.ListDraftsParams) {

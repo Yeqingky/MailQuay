@@ -12,10 +12,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/mailquay/mailquay/internal/crypto"
-	"github.com/mailquay/mailquay/internal/platform"
-	"github.com/mailquay/mailquay/internal/store"
-	"github.com/mailquay/mailquay/internal/store/sqlcgen"
+	"github.com/Yeqingky/MailQuay/internal/crypto"
+	"github.com/Yeqingky/MailQuay/internal/platform"
+	"github.com/Yeqingky/MailQuay/internal/store"
+	"github.com/Yeqingky/MailQuay/internal/store/sqlcgen"
 )
 
 // ErrInvalidSettings marks patch values that failed validation. Only errors

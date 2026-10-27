@@ -7,7 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/mailquay/mailquay/internal/store/sqlcgen"
+	"github.com/Yeqingky/MailQuay/internal/store/sqlcgen"
 )
 
 func (s *Service) runScopeReconcile(ctx context.Context, acct sqlcgen.Account) {

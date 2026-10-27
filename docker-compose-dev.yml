@@ -3,7 +3,7 @@
 #   mailquay: Dockerfile target full - API, sync workers, SSE and the frontend
 #
 # One container serves both the API and the frontend. The frontend is compiled
-# during `docker compose build` from the sibling ../frontend checkout, which
+# during `docker compose build` from the in-repo ./frontend checkout, which
 # Compose passes as the `frontend` build context; no Node process runs in the
 # container. Rebuild after frontend or backend source changes.
 #
@@ -40,7 +40,7 @@ services:
       dockerfile: Dockerfile
       target: full
       additional_contexts:
-        frontend: ../frontend
+        frontend: ./frontend
       args:
         VERSION: ${MAILQUAY_VERSION:-dev}
         COMMIT: ${MAILQUAY_COMMIT:-local}

@@ -20,10 +20,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/mailquay/mailquay/internal/app"
-	"github.com/mailquay/mailquay/internal/auth"
-	"github.com/mailquay/mailquay/internal/config"
-	"github.com/mailquay/mailquay/internal/store"
+	"github.com/Yeqingky/MailQuay/internal/app"
+	"github.com/Yeqingky/MailQuay/internal/auth"
+	"github.com/Yeqingky/MailQuay/internal/config"
+	"github.com/Yeqingky/MailQuay/internal/store"
 )
 
 // testSetupToken is the configured one-time setup token for HTTP tests. It must

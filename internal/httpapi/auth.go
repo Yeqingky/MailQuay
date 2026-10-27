@@ -7,9 +7,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/mailquay/mailquay/internal/auth"
-	"github.com/mailquay/mailquay/internal/config"
-	"github.com/mailquay/mailquay/internal/httpapi/oapi"
+	"github.com/Yeqingky/MailQuay/internal/auth"
+	"github.com/Yeqingky/MailQuay/internal/config"
+	"github.com/Yeqingky/MailQuay/internal/httpapi/oapi"
 )
 
 func (s *Server) GetAuthStatus(w http.ResponseWriter, r *http.Request) {

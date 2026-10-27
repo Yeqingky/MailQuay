@@ -57,18 +57,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-      - name: build frontend from main
+      - name: build frontend
         run: |
-          for attempt in 1 2 3; do
-            rm -rf /tmp/frontend
-            if timeout 300 git clone --depth 1 https://github.com/MailQuay/frontend.git /tmp/frontend; then
-              break
-            fi
-            echo "frontend clone failed (attempt ${attempt}/3), retrying in 10s" >&2
-            sleep 10
-          done
-          [ -d /tmp/frontend/.git ] || { echo "::error::could not clone the frontend repository"; exit 1; }
-          cd /tmp/frontend
+          cd frontend
           timeout 900 corepack pnpm install --frozen-lockfile
           timeout 600 corepack pnpm build
           mkdir -p "$GITHUB_WORKSPACE/internal/webassets" "$GITHUB_WORKSPACE/webassets"
@@ -108,7 +99,7 @@ jobs:
           suffix="${{ matrix.suffix }}"
           {
             echo 'tags<<EOF'
-            echo "ghcr.io/mailquay/mailquay:${short}${suffix}"
+            echo "ghcr.io/yeqingky/mailquay:${short}${suffix}"
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
           echo "tag=${short}${suffix}" >> "$GITHUB_OUTPUT"

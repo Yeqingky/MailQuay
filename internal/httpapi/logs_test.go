@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mailquay/mailquay/internal/platform"
+	"github.com/Yeqingky/MailQuay/internal/platform"
 )
 
 func TestLogsCanBeReadAndCleared(t *testing.T) {

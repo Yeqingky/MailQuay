@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/mailquay/mailquay/internal/emclient"
-	"github.com/mailquay/mailquay/internal/platform"
+	"github.com/Yeqingky/MailQuay/internal/emclient"
+	"github.com/Yeqingky/MailQuay/internal/platform"
 )
 
 // ErrImportSessionNotFound is returned when an eM Client import preview has

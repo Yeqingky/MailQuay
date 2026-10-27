@@ -6,3 +6,5 @@ pg_data
 *.out
 coverage*
 internal/webassets/dist
+frontend/node_modules
+frontend/dist

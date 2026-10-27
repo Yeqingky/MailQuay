@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	mailmime "github.com/mailquay/mailquay/internal/mime"
+	mailmime "github.com/Yeqingky/MailQuay/internal/mime"
 )
 
 const multipartMessage = "From: =?UTF-8?Q?Jos=C3=A9?= <jose@example.com>\r\n" +

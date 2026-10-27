@@ -13,7 +13,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/mailquay/mailquay/internal/imapclient"
+	"github.com/Yeqingky/MailQuay/internal/imapclient"
 )
 
 // DialFunc opens a paced connection. interactive is reserved for callers that

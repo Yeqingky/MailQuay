@@ -7,9 +7,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/mailquay/mailquay/internal/account"
-	"github.com/mailquay/mailquay/internal/discovery"
-	"github.com/mailquay/mailquay/internal/httpapi/oapi"
+	"github.com/Yeqingky/MailQuay/internal/account"
+	"github.com/Yeqingky/MailQuay/internal/discovery"
+	"github.com/Yeqingky/MailQuay/internal/httpapi/oapi"
 )
 
 func (s *Server) ListAccounts(w http.ResponseWriter, r *http.Request) {

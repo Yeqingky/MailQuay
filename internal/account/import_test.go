@@ -3,7 +3,7 @@ package account
 import (
 	"testing"
 
-	"github.com/mailquay/mailquay/internal/emclient"
+	"github.com/Yeqingky/MailQuay/internal/emclient"
 )
 
 func TestBuildImportPreview(t *testing.T) {

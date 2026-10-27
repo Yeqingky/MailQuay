@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mailquay/mailquay/internal/imapclient"
+	"github.com/Yeqingky/MailQuay/internal/imapclient"
 )
 
 // SpecialRoleNames lists the roles a remote folder can take.

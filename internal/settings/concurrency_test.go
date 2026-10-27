@@ -3,7 +3,7 @@ package settings
 import (
 	"testing"
 
-	"github.com/mailquay/mailquay/internal/platform"
+	"github.com/Yeqingky/MailQuay/internal/platform"
 )
 
 func TestEffectiveConcurrency(t *testing.T) {

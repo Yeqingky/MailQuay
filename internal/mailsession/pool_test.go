@@ -14,7 +14,7 @@ import (
 	"github.com/emersion/go-imap/v2/imapserver/imapmemserver"
 	"github.com/google/uuid"
 
-	"github.com/mailquay/mailquay/internal/imapclient"
+	"github.com/Yeqingky/MailQuay/internal/imapclient"
 )
 
 func TestPoolReusesConnection(t *testing.T) {

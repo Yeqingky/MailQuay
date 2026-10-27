@@ -11,14 +11,14 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/mailquay/mailquay/internal/events"
-	"github.com/mailquay/mailquay/internal/mime"
-	"github.com/mailquay/mailquay/internal/platform"
-	"github.com/mailquay/mailquay/internal/search"
-	"github.com/mailquay/mailquay/internal/settings"
-	"github.com/mailquay/mailquay/internal/storage"
-	"github.com/mailquay/mailquay/internal/store"
-	"github.com/mailquay/mailquay/internal/store/sqlcgen"
+	"github.com/Yeqingky/MailQuay/internal/events"
+	"github.com/Yeqingky/MailQuay/internal/mime"
+	"github.com/Yeqingky/MailQuay/internal/platform"
+	"github.com/Yeqingky/MailQuay/internal/search"
+	"github.com/Yeqingky/MailQuay/internal/settings"
+	"github.com/Yeqingky/MailQuay/internal/storage"
+	"github.com/Yeqingky/MailQuay/internal/store"
+	"github.com/Yeqingky/MailQuay/internal/store/sqlcgen"
 )
 
 // Indexer drains search_jobs into the Bleve index.

@@ -1,6 +1,6 @@
 # Production stack using the published full backend image (API + embedded frontend).
 # The image is a placeholder until the first release workflow publishes it:
-#   ghcr.io/mailquay/mailquay
+#   ghcr.io/yeqingky/mailquay
 #
 # Usage:
 #   POSTGRES_PASSWORD=... \
@@ -39,7 +39,7 @@ services:
     networks: [mailquay]
 
   mailquay:
-    image: ghcr.io/mailquay/mailquay:${MAILQUAY_VERSION:-latest}
+    image: ghcr.io/yeqingky/mailquay:${MAILQUAY_VERSION:-latest}
     restart: unless-stopped
     entrypoint: ["/bin/sh", "-c"]
     command: ["/usr/local/bin/mailquay migrate up && exec /usr/local/bin/mailquay serve"]

@@ -16,17 +16,7 @@ jobs:
           node-version: "24"
       - name: build frontend
         run: |
-          version="${GITHUB_REF_NAME}"
-          for attempt in 1 2 3; do
-            rm -rf /tmp/frontend
-            if timeout 300 git clone --depth 1 --branch "${version}" https://github.com/MailQuay/frontend.git /tmp/frontend; then
-              break
-            fi
-            echo "frontend clone failed (attempt ${attempt}/3), retrying in 10s" >&2
-            sleep 10
-          done
-          [ -d /tmp/frontend/.git ] || { echo "::error::frontend tag ${version} is missing; push the frontend ${version} tag before the backend release"; exit 1; }
-          cd /tmp/frontend
+          cd frontend
           timeout 900 corepack pnpm install --frozen-lockfile
           timeout 600 corepack pnpm build
           mkdir -p "$GITHUB_WORKSPACE/webassets"
@@ -109,9 +99,9 @@ jobs:
           suffix="${{ matrix.suffix }}"
           {
             echo 'tags<<EOF'
-            echo "ghcr.io/mailquay/mailquay:${GITHUB_REF_NAME}${suffix}"
-            echo "ghcr.io/mailquay/mailquay:latest${suffix}"
-            echo "ghcr.io/mailquay/mailquay:${short}${suffix}"
+            echo "ghcr.io/yeqingky/mailquay:${GITHUB_REF_NAME}${suffix}"
+            echo "ghcr.io/yeqingky/mailquay:latest${suffix}"
+            echo "ghcr.io/yeqingky/mailquay:${short}${suffix}"
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
       - uses: docker/setup-qemu-action@v3
@@ -129,6 +119,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.tags.outputs.tags }}
+          build-contexts: |
+            frontend=/tmp/frontend-dist
           build-args: |
             VERSION=${{ github.ref_name }}
             COMMIT=${{ github.sha }}

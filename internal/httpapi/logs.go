@@ -3,7 +3,7 @@ package httpapi
 import (
 	"net/http"
 
-	"github.com/mailquay/mailquay/internal/httpapi/oapi"
+	"github.com/Yeqingky/MailQuay/internal/httpapi/oapi"
 )
 
 func (s *Server) ListLogs(w http.ResponseWriter, _ *http.Request) {
