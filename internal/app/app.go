@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -215,7 +214,7 @@ func setupAuth(ctx context.Context, st *store.Store, settingsSvc *settings.Servi
 // so it never appears in container logs. The file is readable by the runtime
 // user only.
 func writeSetupToken(dataDir, token string) (string, error) {
-	path := filepath.Join(dataDir, "setup-token")
+	path := config.SetupTokenPath(dataDir)
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		return "", fmt.Errorf("create data directory: %w", err)
 	}

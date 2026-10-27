@@ -2,10 +2,13 @@ package httpapi
 
 import (
 	"errors"
+	"io/fs"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/mailquay/mailquay/internal/auth"
+	"github.com/mailquay/mailquay/internal/config"
 	"github.com/mailquay/mailquay/internal/httpapi/oapi"
 )
 
@@ -62,7 +65,17 @@ func (s *Server) SetupOwner(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.setAuthCookies(w, r, sess)
+	s.removeSetupTokenFile()
 	writeJSON(w, http.StatusCreated, authResponse(sess))
+}
+
+// removeSetupTokenFile deletes the generated setup token once the owner account
+// exists, so no plaintext credential is left in the data directory.
+func (s *Server) removeSetupTokenFile() {
+	err := os.Remove(config.SetupTokenPath(s.cfg.DataDir))
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		s.logger.Warn("remove setup token file", "error", err)
+	}
 }
 
 func (s *Server) Login(w http.ResponseWriter, r *http.Request) {

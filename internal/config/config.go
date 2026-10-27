@@ -5,8 +5,14 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 )
+
+// SetupTokenPath returns the file that stores a generated one-time setup token.
+func SetupTokenPath(dataDir string) string {
+	return filepath.Join(dataDir, "setup-token")
+}
 
 // Config is the validated runtime configuration.
 type Config struct {
