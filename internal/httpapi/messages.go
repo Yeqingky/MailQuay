@@ -381,14 +381,29 @@ func (s *Server) enrichOne(r *http.Request, detail *oapi.MessageDetail) {
 }
 
 func writeAttachment(w http.ResponseWriter, filename, contentType string, data []byte) {
-	if contentType == "" {
-		contentType = "application/octet-stream"
-	}
-	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Type", attachmentContentType(contentType))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": safeFilename(filename)}))
 	w.Header().Set("Content-Length", intToString(len(data)))
 	_, _ = w.Write(data)
+}
+
+// attachmentContentType normalizes the media type recorded for an attachment.
+// Malformed values fall back to application/octet-stream so the stored header
+// cannot inject or echo an invalid type.
+func attachmentContentType(value string) string {
+	mediaType, params, err := mime.ParseMediaType(value)
+	if err != nil {
+		return "application/octet-stream"
+	}
+	mediaType = strings.ToLower(mediaType)
+	if len(params) == 0 {
+		return mediaType
+	}
+	if formatted := mime.FormatMediaType(mediaType, params); formatted != "" {
+		return formatted
+	}
+	return mediaType
 }
 
 func safeFilename(name string) string {
