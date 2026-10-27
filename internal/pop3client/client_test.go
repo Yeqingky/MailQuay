@@ -116,7 +116,7 @@ func TestParseLISTLines(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseLISTLines: %v", err)
 	}
-	if sizes[1] != 100 || sizes[2] != 2500 {
+	if sizes[1].Size != 100 || sizes[2].Size != 2500 || sizes[1].Oversized || sizes[2].Oversized {
 		t.Fatalf("unexpected sizes: %+v", sizes)
 	}
 	if _, err := parseLISTLines([]string{"1 x"}); err == nil {
@@ -162,15 +162,19 @@ func TestReadMultilineRejectsOversizedBody(t *testing.T) {
 	}
 }
 
-func TestParseLISTRejectsOversizedMessage(t *testing.T) {
-	if _, err := parseLISTLines([]string{"1 999999999999"}); err == nil {
-		t.Fatal("oversized LIST size accepted")
+func TestParseLISTMarksOversizedMessage(t *testing.T) {
+	listed, err := parseLISTLines([]string{"1 999999999999"})
+	if err != nil {
+		t.Fatalf("oversized LIST row failed the whole listing: %v", err)
+	}
+	if !listed[1].Oversized {
+		t.Fatal("oversized LIST size not marked")
 	}
 	if _, err := parseLISTLines([]string{"1 -5"}); err == nil {
 		t.Fatal("negative LIST size accepted")
 	}
 	sizes, err := parseLISTLines([]string{"2 4096"})
-	if err != nil || sizes[2] != 4096 {
+	if err != nil || sizes[2].Size != 4096 || sizes[2].Oversized {
 		t.Fatalf("parseLISTLines = %v, %v", sizes, err)
 	}
 }

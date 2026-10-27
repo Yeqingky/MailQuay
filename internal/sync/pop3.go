@@ -84,6 +84,12 @@ func (s *Service) syncPOP3(ctx context.Context, acct sqlcgen.Account, creds acco
 			processed++
 			continue
 		}
+		if info.Oversized {
+			s.logger.Warn("skip oversized pop3 message", "uidl", info.UIDL, "size", info.Size)
+			processed++
+			s.updateTask(ctx, "mailbox_sync", &acct.ID, processed, int32(len(infos)), "polling POP3")
+			continue
+		}
 		if err := s.importPOP3Message(ctx, client, acct, inbox, info); err != nil {
 			s.logger.Warn("import pop3 message", "uidl", info.UIDL, "error", err)
 		}

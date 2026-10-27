@@ -33,6 +33,8 @@ import (
 type pop3Message struct {
 	uidl string
 	raw  string
+	// listedSize overrides the size reported by LIST when non-zero.
+	listedSize int64
 }
 
 type pop3Server struct {
@@ -88,7 +90,11 @@ func (s *pop3Server) handle(t *testing.T, conn net.Conn) {
 		case "LIST":
 			write("+OK")
 			for i, msg := range s.messages {
-				write(fmt.Sprintf("%d %d", i+1, len(msg.raw)))
+				size := int64(len(msg.raw))
+				if msg.listedSize > 0 {
+					size = msg.listedSize
+				}
+				write(fmt.Sprintf("%d %d", i+1, size))
 			}
 			write(".")
 		case "TOP":
@@ -155,6 +161,8 @@ func TestPOP3InitialSync(t *testing.T) {
 	fake := &pop3Server{messages: []pop3Message{
 		{uidl: "uidl-one", raw: "From: alice@example.com\r\nTo: bob@example.com\r\nSubject: POP first\r\nMessage-ID: <pop1@example.com>\r\nContent-Type: text/plain; charset=utf-8\r\n\r\npop3 body one\r\n"},
 		{uidl: "uidl-two", raw: "From: carol@example.com\r\nTo: bob@example.com\r\nSubject: POP second\r\nMessage-ID: <pop2@example.com>\r\nContent-Type: text/plain; charset=utf-8\r\n\r\npop3 body two\r\n"},
+		// A single oversized message must not fail the whole account sync.
+		{uidl: "uidl-huge", raw: "From: dave@example.com\r\nSubject: POP huge\r\n\r\nhuge\r\n", listedSize: 300 << 20},
 	}}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

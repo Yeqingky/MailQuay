@@ -69,6 +69,9 @@ type MessageInfo struct {
 	Number int
 	UIDL   string
 	Size   int64
+	// Oversized marks a message whose listed size exceeds the client limit.
+	// Callers skip it instead of failing the whole listing.
+	Oversized bool
 }
 
 // Client is an authenticated POP3 session.
@@ -227,7 +230,12 @@ func (c *Client) UIDL(ctx context.Context) ([]MessageInfo, error) {
 			return err
 		}
 		for i := range msgs {
-			msgs[i].Size = sizes[msgs[i].Number]
+			listed, ok := sizes[msgs[i].Number]
+			if !ok {
+				continue
+			}
+			msgs[i].Size = listed.Size
+			msgs[i].Oversized = listed.Oversized
 		}
 		out = msgs
 		return nil
@@ -489,9 +497,16 @@ func parseUIDLLines(lines []string) ([]MessageInfo, error) {
 	return out, nil
 }
 
+// listedSize is one LIST row. Oversized messages stay in the listing so the
+// sync loop can skip them without failing every other message.
+type listedSize struct {
+	Size      int64
+	Oversized bool
+}
+
 // parseLISTLines parses "number size" rows.
-func parseLISTLines(lines []string) (map[int]int64, error) {
-	out := make(map[int]int64, len(lines))
+func parseLISTLines(lines []string) (map[int]listedSize, error) {
+	out := make(map[int]listedSize, len(lines))
 	for _, line := range lines {
 		if strings.TrimSpace(line) == "" {
 			continue
@@ -505,10 +520,10 @@ func parseLISTLines(lines []string) (map[int]int64, error) {
 			return nil, fmt.Errorf("malformed LIST message number %q", fields[0])
 		}
 		size, err := strconv.ParseInt(fields[1], 10, 64)
-		if err != nil || size < 0 || size > maxMessageBytes {
+		if err != nil || size < 0 {
 			return nil, fmt.Errorf("malformed LIST size %q", fields[1])
 		}
-		out[number] = size
+		out[number] = listedSize{Size: size, Oversized: size > maxMessageBytes}
 	}
 	return out, nil
 }
