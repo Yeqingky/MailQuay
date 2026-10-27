@@ -64,21 +64,14 @@ func TestSetupRemovesGeneratedTokenFile(t *testing.T) {
 		t.Fatalf("setup token file still present after setup: %v", err)
 	}
 
-	// An initialized instance must still start when an old short token is left
-	// in the environment.
+	// Setup token validation applies on every start, not only before setup.
 	restartDir := filepath.Join(t.TempDir(), "restart")
 	t.Setenv("MAILQUAY_DATABASE_URL", dsn)
 	t.Setenv("MAILQUAY_SECRET_KEY", mustKey(t))
 	t.Setenv("MAILQUAY_DATA_DIR", restartDir)
 	t.Setenv("MAILQUAY_SEARCH_PATH", filepath.Join(restartDir, "search"))
 	t.Setenv("MAILQUAY_SETUP_TOKEN", "changeme")
-	restartCfg, err := config.Load()
-	if err != nil {
-		t.Fatalf("config load with a short token after initialization: %v", err)
+	if _, err := config.Load(); err == nil {
+		t.Fatal("expected a short setup token to be rejected after initialization")
 	}
-	restarted, err := app.New(ctx, restartCfg)
-	if err != nil {
-		t.Fatalf("restart with a short setup token: %v", err)
-	}
-	restarted.Close()
 }

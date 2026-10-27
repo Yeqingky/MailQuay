@@ -29,7 +29,11 @@ type Account struct {
 	Pop3Security             string          `json:"pop3_security"`
 	SmtpAddr                 *string         `json:"smtp_addr"`
 	SmtpSecurity             string          `json:"smtp_security"`
+	SmtpUsername             *string         `json:"smtp_username"`
+	SmtpPasswordEnc          []byte          `json:"smtp_password_enc"`
 	SmtpHeloHostname         string          `json:"smtp_helo_hostname"`
+	DefaultSendName          string          `json:"default_send_name"`
+	DefaultReplyTo           string          `json:"default_reply_to"`
 	SyncEnabled              bool            `json:"sync_enabled"`
 	SyncState                string          `json:"sync_state"`
 	LastError                string          `json:"last_error"`
@@ -39,15 +43,11 @@ type Account struct {
 	SentCopyMode             string          `json:"sent_copy_mode"`
 	Pop3LeaveOnServer        bool            `json:"pop3_leave_on_server"`
 	Pop3DeleteOnServer       bool            `json:"pop3_delete_on_server"`
+	AutoDetectSpecialFolders bool            `json:"auto_detect_special_folders"`
+	SpecialFolders           json.RawMessage `json:"special_folders"`
 	DeletedAt                *time.Time      `json:"deleted_at"`
 	CreatedAt                time.Time       `json:"created_at"`
 	UpdatedAt                time.Time       `json:"updated_at"`
-	SmtpUsername             *string         `json:"smtp_username"`
-	SmtpPasswordEnc          []byte          `json:"smtp_password_enc"`
-	AutoDetectSpecialFolders bool            `json:"auto_detect_special_folders"`
-	SpecialFolders           json.RawMessage `json:"special_folders"`
-	DefaultSendName          string          `json:"default_send_name"`
-	DefaultReplyTo           string          `json:"default_reply_to"`
 }
 
 type Attachment struct {

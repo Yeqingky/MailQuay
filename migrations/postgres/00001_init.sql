@@ -1,4 +1,8 @@
 -- +goose Up
+-- Baseline schema for v0.1.0. Fresh installs apply this file and later
+-- releases append new migrations; there is no upgrade path from pre-release
+-- snapshots.
+
 CREATE TABLE users (
     id uuid PRIMARY KEY,
     username text NOT NULL,
@@ -28,7 +32,6 @@ CREATE TABLE accounts (
     id uuid PRIMARY KEY,
     name text NOT NULL,
     email text NOT NULL,
-    color text NOT NULL DEFAULT '#f97316',
     provider text NOT NULL DEFAULT 'custom',
     username text NOT NULL,
     auth_type text NOT NULL DEFAULT 'password',
@@ -43,7 +46,11 @@ CREATE TABLE accounts (
     pop3_security text NOT NULL DEFAULT 'implicit_tls',
     smtp_addr text,
     smtp_security text NOT NULL DEFAULT 'starttls',
+    smtp_username text,
+    smtp_password_enc bytea,
     smtp_helo_hostname text NOT NULL DEFAULT '',
+    default_send_name text NOT NULL DEFAULT '',
+    default_reply_to text NOT NULL DEFAULT '',
     sync_enabled boolean NOT NULL DEFAULT true,
     sync_state text NOT NULL DEFAULT 'idle',
     last_error text NOT NULL DEFAULT '',
@@ -53,6 +60,8 @@ CREATE TABLE accounts (
     sent_copy_mode text NOT NULL DEFAULT 'auto',
     pop3_leave_on_server boolean NOT NULL DEFAULT true,
     pop3_delete_on_server boolean NOT NULL DEFAULT false,
+    auto_detect_special_folders boolean NOT NULL DEFAULT true,
+    special_folders jsonb NOT NULL DEFAULT '{}'::jsonb,
     deleted_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -67,24 +76,6 @@ CREATE TABLE accounts (
 );
 CREATE UNIQUE INDEX accounts_email_key ON accounts (lower(email)) WHERE deleted_at IS NULL;
 CREATE INDEX accounts_active_idx ON accounts (created_at) WHERE deleted_at IS NULL;
-
-CREATE TABLE identities (
-    account_id uuid NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
-    email text NOT NULL,
-    name text NOT NULL DEFAULT '',
-    organization text NOT NULL DEFAULT '',
-    reply_to text NOT NULL DEFAULT '',
-    bcc text[],
-    signature_html text NOT NULL DEFAULT '',
-    signature_text text NOT NULL DEFAULT '',
-    signature_mode text NOT NULL DEFAULT 'all',
-    is_default boolean NOT NULL DEFAULT false,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (account_id, email),
-    CONSTRAINT identities_signature_mode_check CHECK (signature_mode IN ('all', 'new', 'reply', 'forward', 'none'))
-);
-CREATE UNIQUE INDEX identities_default_key ON identities (account_id) WHERE is_default;
 
 CREATE TABLE mailboxes (
     id uuid PRIMARY KEY,
@@ -167,6 +158,9 @@ CREATE INDEX messages_unread_idx ON messages (mailbox_id, received_at DESC) WHER
 CREATE INDEX messages_account_dedupe_idx ON messages (account_id, dedupe_key);
 CREATE INDEX messages_account_marked_idx ON messages (account_id, local_flag) WHERE local_flag;
 CREATE INDEX messages_thread_idx ON messages (thread_id, sent_at);
+CREATE INDEX messages_mailbox_uidless_header_idx
+    ON messages (mailbox_id, message_id_header)
+    WHERE uid IS NULL;
 
 CREATE TABLE attachments (
     id uuid PRIMARY KEY,
@@ -183,6 +177,15 @@ CREATE TABLE attachments (
 CREATE INDEX attachments_message_idx ON attachments (message_id);
 CREATE INDEX attachments_sha256_idx ON attachments (sha256);
 
+CREATE TABLE uploaded_attachments (
+    id uuid PRIMARY KEY,
+    filename text NOT NULL DEFAULT '',
+    content_type text NOT NULL DEFAULT 'application/octet-stream',
+    size bigint NOT NULL DEFAULT 0,
+    sha256 text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX uploaded_attachments_created_idx ON uploaded_attachments (created_at);
 
 CREATE TABLE local_archives (
     id uuid PRIMARY KEY,
@@ -209,28 +212,9 @@ CREATE UNIQUE INDEX local_archives_message_key ON local_archives (origin_account
 CREATE UNIQUE INDEX local_archives_raw_key ON local_archives (raw_sha256);
 CREATE INDEX local_archives_archived_idx ON local_archives (archived_at DESC);
 
-CREATE TABLE delete_queue (
-    id uuid PRIMARY KEY,
-    message_id uuid NOT NULL,
-    account_id uuid NOT NULL,
-    mailbox_id uuid NOT NULL,
-    uid bigint,
-    delete_after timestamptz NOT NULL,
-    status text NOT NULL DEFAULT 'pending',
-    attempts integer NOT NULL DEFAULT 0,
-    last_error text NOT NULL DEFAULT '',
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT delete_queue_status_check CHECK (status IN ('pending', 'deleted', 'failed'))
-);
-CREATE INDEX delete_queue_due_idx ON delete_queue (status, delete_after);
-CREATE UNIQUE INDEX delete_queue_message_key ON delete_queue (message_id) WHERE status = 'pending';
-
 CREATE TABLE drafts (
     id uuid PRIMARY KEY,
     account_id uuid NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
-    identity_account_id uuid NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
-    identity_email text NOT NULL DEFAULT '',
     in_reply_to text NOT NULL DEFAULT '',
     headers jsonb NOT NULL DEFAULT '{}'::jsonb,
     body_text text NOT NULL DEFAULT '',
@@ -257,8 +241,6 @@ CREATE INDEX drafts_status_idx ON drafts (status, updated_at DESC);
 CREATE TABLE outbox (
     id uuid PRIMARY KEY,
     account_id uuid NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
-    identity_account_id uuid NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
-    identity_email text NOT NULL,
     draft_id uuid NOT NULL REFERENCES drafts (id) ON DELETE CASCADE,
     message_id_header text NOT NULL,
     status text NOT NULL DEFAULT 'pending',
@@ -356,13 +338,12 @@ DROP TABLE IF EXISTS search_jobs;
 DROP TABLE IF EXISTS pending_ops;
 DROP TABLE IF EXISTS outbox;
 DROP TABLE IF EXISTS drafts;
-DROP TABLE IF EXISTS delete_queue;
 DROP TABLE IF EXISTS local_archives;
+DROP TABLE IF EXISTS uploaded_attachments;
 DROP TABLE IF EXISTS attachments;
 DROP TABLE IF EXISTS messages;
 DROP TABLE IF EXISTS threads;
 DROP TABLE IF EXISTS mailboxes;
-DROP TABLE IF EXISTS identities;
 DROP TABLE IF EXISTS accounts;
 DROP TABLE IF EXISTS sessions;
 DROP TABLE IF EXISTS users;

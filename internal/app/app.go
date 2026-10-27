@@ -193,9 +193,6 @@ func setupAuth(ctx context.Context, st *store.Store, settingsSvc *settings.Servi
 		return nil, err
 	}
 	token := cfg.SetupToken
-	if err := validateSetupToken(needs == 0, token); err != nil {
-		return nil, err
-	}
 	if needs == 0 && token == "" {
 		buf := make([]byte, 24)
 		if _, err := rand.Read(buf); err != nil {
@@ -211,19 +208,6 @@ func setupAuth(ctx context.Context, st *store.Store, settingsSvc *settings.Servi
 		logger.Warn("setup token configured; open /setup", "source", "MAILQUAY_SETUP_TOKEN")
 	}
 	return auth.NewService(st, settingsSvc, logger, token), nil
-}
-
-// validateSetupToken rejects short configured tokens only while the instance is
-// still uninitialized. Once the owner exists the value is ignored, so an
-// upgraded deployment that still exports an old short token keeps starting.
-func validateSetupToken(needsSetup bool, token string) error {
-	if !needsSetup || token == "" {
-		return nil
-	}
-	if len(token) < 16 {
-		return fmt.Errorf("MAILQUAY_SETUP_TOKEN must be at least 16 characters")
-	}
-	return nil
 }
 
 // writeSetupToken stores the generated one-time token under the data directory

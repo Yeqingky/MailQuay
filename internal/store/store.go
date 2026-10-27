@@ -97,8 +97,10 @@ func MigrateDown(ctx context.Context, databaseURL string, steps int) error {
 	if err := goose.SetDialect("postgres"); err != nil {
 		return fmt.Errorf("set migration dialect: %w", err)
 	}
-	if err := goose.DownToContext(ctx, db, "postgres", int64(steps)); err != nil {
-		return fmt.Errorf("roll back migrations: %w", err)
+	for range steps {
+		if err := goose.DownContext(ctx, db, "postgres"); err != nil {
+			return fmt.Errorf("roll back migration: %w", err)
+		}
 	}
 	return nil
 }

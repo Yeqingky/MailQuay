@@ -43,7 +43,7 @@ INSERT INTO accounts (
     $24, $25, $26, $27,
     $28, $29, $30, $31
 )
-RETURNING id, name, email, provider, username, auth_type, password_enc, oauth_provider, oauth_scopes, oauth_refresh_enc, receive_protocol, imap_addr, imap_security, pop3_addr, pop3_security, smtp_addr, smtp_security, smtp_helo_hostname, sync_enabled, sync_state, last_error, initial_sync_range, download_scope, initial_sync_cutoff_at, sent_copy_mode, pop3_leave_on_server, pop3_delete_on_server, deleted_at, created_at, updated_at, smtp_username, smtp_password_enc, auto_detect_special_folders, special_folders, default_send_name, default_reply_to
+RETURNING id, name, email, provider, username, auth_type, password_enc, oauth_provider, oauth_scopes, oauth_refresh_enc, receive_protocol, imap_addr, imap_security, pop3_addr, pop3_security, smtp_addr, smtp_security, smtp_username, smtp_password_enc, smtp_helo_hostname, default_send_name, default_reply_to, sync_enabled, sync_state, last_error, initial_sync_range, download_scope, initial_sync_cutoff_at, sent_copy_mode, pop3_leave_on_server, pop3_delete_on_server, auto_detect_special_folders, special_folders, deleted_at, created_at, updated_at
 `
 
 type CreateAccountParams struct {
@@ -133,7 +133,11 @@ func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (A
 		&i.Pop3Security,
 		&i.SmtpAddr,
 		&i.SmtpSecurity,
+		&i.SmtpUsername,
+		&i.SmtpPasswordEnc,
 		&i.SmtpHeloHostname,
+		&i.DefaultSendName,
+		&i.DefaultReplyTo,
 		&i.SyncEnabled,
 		&i.SyncState,
 		&i.LastError,
@@ -143,21 +147,17 @@ func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (A
 		&i.SentCopyMode,
 		&i.Pop3LeaveOnServer,
 		&i.Pop3DeleteOnServer,
+		&i.AutoDetectSpecialFolders,
+		&i.SpecialFolders,
 		&i.DeletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.SmtpUsername,
-		&i.SmtpPasswordEnc,
-		&i.AutoDetectSpecialFolders,
-		&i.SpecialFolders,
-		&i.DefaultSendName,
-		&i.DefaultReplyTo,
 	)
 	return i, err
 }
 
 const getAccount = `-- name: GetAccount :one
-SELECT id, name, email, provider, username, auth_type, password_enc, oauth_provider, oauth_scopes, oauth_refresh_enc, receive_protocol, imap_addr, imap_security, pop3_addr, pop3_security, smtp_addr, smtp_security, smtp_helo_hostname, sync_enabled, sync_state, last_error, initial_sync_range, download_scope, initial_sync_cutoff_at, sent_copy_mode, pop3_leave_on_server, pop3_delete_on_server, deleted_at, created_at, updated_at, smtp_username, smtp_password_enc, auto_detect_special_folders, special_folders, default_send_name, default_reply_to FROM accounts WHERE id = $1
+SELECT id, name, email, provider, username, auth_type, password_enc, oauth_provider, oauth_scopes, oauth_refresh_enc, receive_protocol, imap_addr, imap_security, pop3_addr, pop3_security, smtp_addr, smtp_security, smtp_username, smtp_password_enc, smtp_helo_hostname, default_send_name, default_reply_to, sync_enabled, sync_state, last_error, initial_sync_range, download_scope, initial_sync_cutoff_at, sent_copy_mode, pop3_leave_on_server, pop3_delete_on_server, auto_detect_special_folders, special_folders, deleted_at, created_at, updated_at FROM accounts WHERE id = $1
 `
 
 func (q *Queries) GetAccount(ctx context.Context, id uuid.UUID) (Account, error) {
@@ -181,7 +181,11 @@ func (q *Queries) GetAccount(ctx context.Context, id uuid.UUID) (Account, error)
 		&i.Pop3Security,
 		&i.SmtpAddr,
 		&i.SmtpSecurity,
+		&i.SmtpUsername,
+		&i.SmtpPasswordEnc,
 		&i.SmtpHeloHostname,
+		&i.DefaultSendName,
+		&i.DefaultReplyTo,
 		&i.SyncEnabled,
 		&i.SyncState,
 		&i.LastError,
@@ -191,15 +195,11 @@ func (q *Queries) GetAccount(ctx context.Context, id uuid.UUID) (Account, error)
 		&i.SentCopyMode,
 		&i.Pop3LeaveOnServer,
 		&i.Pop3DeleteOnServer,
+		&i.AutoDetectSpecialFolders,
+		&i.SpecialFolders,
 		&i.DeletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.SmtpUsername,
-		&i.SmtpPasswordEnc,
-		&i.AutoDetectSpecialFolders,
-		&i.SpecialFolders,
-		&i.DefaultSendName,
-		&i.DefaultReplyTo,
 	)
 	return i, err
 }
@@ -214,7 +214,7 @@ func (q *Queries) HardDeleteAccount(ctx context.Context, id uuid.UUID) error {
 }
 
 const listAccounts = `-- name: ListAccounts :many
-SELECT id, name, email, provider, username, auth_type, password_enc, oauth_provider, oauth_scopes, oauth_refresh_enc, receive_protocol, imap_addr, imap_security, pop3_addr, pop3_security, smtp_addr, smtp_security, smtp_helo_hostname, sync_enabled, sync_state, last_error, initial_sync_range, download_scope, initial_sync_cutoff_at, sent_copy_mode, pop3_leave_on_server, pop3_delete_on_server, deleted_at, created_at, updated_at, smtp_username, smtp_password_enc, auto_detect_special_folders, special_folders, default_send_name, default_reply_to FROM accounts WHERE deleted_at IS NULL ORDER BY created_at, id
+SELECT id, name, email, provider, username, auth_type, password_enc, oauth_provider, oauth_scopes, oauth_refresh_enc, receive_protocol, imap_addr, imap_security, pop3_addr, pop3_security, smtp_addr, smtp_security, smtp_username, smtp_password_enc, smtp_helo_hostname, default_send_name, default_reply_to, sync_enabled, sync_state, last_error, initial_sync_range, download_scope, initial_sync_cutoff_at, sent_copy_mode, pop3_leave_on_server, pop3_delete_on_server, auto_detect_special_folders, special_folders, deleted_at, created_at, updated_at FROM accounts WHERE deleted_at IS NULL ORDER BY created_at, id
 `
 
 func (q *Queries) ListAccounts(ctx context.Context) ([]Account, error) {
@@ -244,7 +244,11 @@ func (q *Queries) ListAccounts(ctx context.Context) ([]Account, error) {
 			&i.Pop3Security,
 			&i.SmtpAddr,
 			&i.SmtpSecurity,
+			&i.SmtpUsername,
+			&i.SmtpPasswordEnc,
 			&i.SmtpHeloHostname,
+			&i.DefaultSendName,
+			&i.DefaultReplyTo,
 			&i.SyncEnabled,
 			&i.SyncState,
 			&i.LastError,
@@ -254,15 +258,11 @@ func (q *Queries) ListAccounts(ctx context.Context) ([]Account, error) {
 			&i.SentCopyMode,
 			&i.Pop3LeaveOnServer,
 			&i.Pop3DeleteOnServer,
+			&i.AutoDetectSpecialFolders,
+			&i.SpecialFolders,
 			&i.DeletedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.SmtpUsername,
-			&i.SmtpPasswordEnc,
-			&i.AutoDetectSpecialFolders,
-			&i.SpecialFolders,
-			&i.DefaultSendName,
-			&i.DefaultReplyTo,
 		); err != nil {
 			return nil, err
 		}
@@ -275,7 +275,7 @@ func (q *Queries) ListAccounts(ctx context.Context) ([]Account, error) {
 }
 
 const listActiveAccounts = `-- name: ListActiveAccounts :many
-SELECT id, name, email, provider, username, auth_type, password_enc, oauth_provider, oauth_scopes, oauth_refresh_enc, receive_protocol, imap_addr, imap_security, pop3_addr, pop3_security, smtp_addr, smtp_security, smtp_helo_hostname, sync_enabled, sync_state, last_error, initial_sync_range, download_scope, initial_sync_cutoff_at, sent_copy_mode, pop3_leave_on_server, pop3_delete_on_server, deleted_at, created_at, updated_at, smtp_username, smtp_password_enc, auto_detect_special_folders, special_folders, default_send_name, default_reply_to FROM accounts WHERE deleted_at IS NULL AND sync_enabled ORDER BY created_at, id
+SELECT id, name, email, provider, username, auth_type, password_enc, oauth_provider, oauth_scopes, oauth_refresh_enc, receive_protocol, imap_addr, imap_security, pop3_addr, pop3_security, smtp_addr, smtp_security, smtp_username, smtp_password_enc, smtp_helo_hostname, default_send_name, default_reply_to, sync_enabled, sync_state, last_error, initial_sync_range, download_scope, initial_sync_cutoff_at, sent_copy_mode, pop3_leave_on_server, pop3_delete_on_server, auto_detect_special_folders, special_folders, deleted_at, created_at, updated_at FROM accounts WHERE deleted_at IS NULL AND sync_enabled ORDER BY created_at, id
 `
 
 func (q *Queries) ListActiveAccounts(ctx context.Context) ([]Account, error) {
@@ -305,7 +305,11 @@ func (q *Queries) ListActiveAccounts(ctx context.Context) ([]Account, error) {
 			&i.Pop3Security,
 			&i.SmtpAddr,
 			&i.SmtpSecurity,
+			&i.SmtpUsername,
+			&i.SmtpPasswordEnc,
 			&i.SmtpHeloHostname,
+			&i.DefaultSendName,
+			&i.DefaultReplyTo,
 			&i.SyncEnabled,
 			&i.SyncState,
 			&i.LastError,
@@ -315,15 +319,11 @@ func (q *Queries) ListActiveAccounts(ctx context.Context) ([]Account, error) {
 			&i.SentCopyMode,
 			&i.Pop3LeaveOnServer,
 			&i.Pop3DeleteOnServer,
+			&i.AutoDetectSpecialFolders,
+			&i.SpecialFolders,
 			&i.DeletedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.SmtpUsername,
-			&i.SmtpPasswordEnc,
-			&i.AutoDetectSpecialFolders,
-			&i.SpecialFolders,
-			&i.DefaultSendName,
-			&i.DefaultReplyTo,
 		); err != nil {
 			return nil, err
 		}
@@ -336,7 +336,7 @@ func (q *Queries) ListActiveAccounts(ctx context.Context) ([]Account, error) {
 }
 
 const listDeletedAccounts = `-- name: ListDeletedAccounts :many
-SELECT id, name, email, provider, username, auth_type, password_enc, oauth_provider, oauth_scopes, oauth_refresh_enc, receive_protocol, imap_addr, imap_security, pop3_addr, pop3_security, smtp_addr, smtp_security, smtp_helo_hostname, sync_enabled, sync_state, last_error, initial_sync_range, download_scope, initial_sync_cutoff_at, sent_copy_mode, pop3_leave_on_server, pop3_delete_on_server, deleted_at, created_at, updated_at, smtp_username, smtp_password_enc, auto_detect_special_folders, special_folders, default_send_name, default_reply_to FROM accounts WHERE deleted_at IS NOT NULL ORDER BY deleted_at
+SELECT id, name, email, provider, username, auth_type, password_enc, oauth_provider, oauth_scopes, oauth_refresh_enc, receive_protocol, imap_addr, imap_security, pop3_addr, pop3_security, smtp_addr, smtp_security, smtp_username, smtp_password_enc, smtp_helo_hostname, default_send_name, default_reply_to, sync_enabled, sync_state, last_error, initial_sync_range, download_scope, initial_sync_cutoff_at, sent_copy_mode, pop3_leave_on_server, pop3_delete_on_server, auto_detect_special_folders, special_folders, deleted_at, created_at, updated_at FROM accounts WHERE deleted_at IS NOT NULL ORDER BY deleted_at
 `
 
 func (q *Queries) ListDeletedAccounts(ctx context.Context) ([]Account, error) {
@@ -366,7 +366,11 @@ func (q *Queries) ListDeletedAccounts(ctx context.Context) ([]Account, error) {
 			&i.Pop3Security,
 			&i.SmtpAddr,
 			&i.SmtpSecurity,
+			&i.SmtpUsername,
+			&i.SmtpPasswordEnc,
 			&i.SmtpHeloHostname,
+			&i.DefaultSendName,
+			&i.DefaultReplyTo,
 			&i.SyncEnabled,
 			&i.SyncState,
 			&i.LastError,
@@ -376,15 +380,11 @@ func (q *Queries) ListDeletedAccounts(ctx context.Context) ([]Account, error) {
 			&i.SentCopyMode,
 			&i.Pop3LeaveOnServer,
 			&i.Pop3DeleteOnServer,
+			&i.AutoDetectSpecialFolders,
+			&i.SpecialFolders,
 			&i.DeletedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.SmtpUsername,
-			&i.SmtpPasswordEnc,
-			&i.AutoDetectSpecialFolders,
-			&i.SpecialFolders,
-			&i.DefaultSendName,
-			&i.DefaultReplyTo,
 		); err != nil {
 			return nil, err
 		}
@@ -449,7 +449,7 @@ UPDATE accounts SET
     default_send_name = $29, default_reply_to = $30,
     updated_at = now()
 WHERE id = $1
-RETURNING id, name, email, provider, username, auth_type, password_enc, oauth_provider, oauth_scopes, oauth_refresh_enc, receive_protocol, imap_addr, imap_security, pop3_addr, pop3_security, smtp_addr, smtp_security, smtp_helo_hostname, sync_enabled, sync_state, last_error, initial_sync_range, download_scope, initial_sync_cutoff_at, sent_copy_mode, pop3_leave_on_server, pop3_delete_on_server, deleted_at, created_at, updated_at, smtp_username, smtp_password_enc, auto_detect_special_folders, special_folders, default_send_name, default_reply_to
+RETURNING id, name, email, provider, username, auth_type, password_enc, oauth_provider, oauth_scopes, oauth_refresh_enc, receive_protocol, imap_addr, imap_security, pop3_addr, pop3_security, smtp_addr, smtp_security, smtp_username, smtp_password_enc, smtp_helo_hostname, default_send_name, default_reply_to, sync_enabled, sync_state, last_error, initial_sync_range, download_scope, initial_sync_cutoff_at, sent_copy_mode, pop3_leave_on_server, pop3_delete_on_server, auto_detect_special_folders, special_folders, deleted_at, created_at, updated_at
 `
 
 type UpdateAccountParams struct {
@@ -537,7 +537,11 @@ func (q *Queries) UpdateAccount(ctx context.Context, arg UpdateAccountParams) (A
 		&i.Pop3Security,
 		&i.SmtpAddr,
 		&i.SmtpSecurity,
+		&i.SmtpUsername,
+		&i.SmtpPasswordEnc,
 		&i.SmtpHeloHostname,
+		&i.DefaultSendName,
+		&i.DefaultReplyTo,
 		&i.SyncEnabled,
 		&i.SyncState,
 		&i.LastError,
@@ -547,15 +551,11 @@ func (q *Queries) UpdateAccount(ctx context.Context, arg UpdateAccountParams) (A
 		&i.SentCopyMode,
 		&i.Pop3LeaveOnServer,
 		&i.Pop3DeleteOnServer,
+		&i.AutoDetectSpecialFolders,
+		&i.SpecialFolders,
 		&i.DeletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.SmtpUsername,
-		&i.SmtpPasswordEnc,
-		&i.AutoDetectSpecialFolders,
-		&i.SpecialFolders,
-		&i.DefaultSendName,
-		&i.DefaultReplyTo,
 	)
 	return i, err
 }
