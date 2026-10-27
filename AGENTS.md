@@ -22,6 +22,7 @@
 - 前端不直接连接 IMAP/POP3/SMTP, 不接触邮箱凭据.
 - 界面不得引用第三方品牌名或商标. 环形任务指示器只使用通用命名和自主配色.
 - 登录只使用用户名和密码, 不做邮箱绑定, 邮件验证码或验证链接.
+- 自动生成的 setup token 写入数据目录 `setup-token` 文件 (`0600`), 不写入日志; `/auth/setup` 按 IP 限流, 自定义 `MAILQUAY_SETUP_TOKEN` 至少 16 字符.
 - TLS 由外部反代终止; 只在可信代理来源信任 `X-Forwarded-Proto`, 防止伪造.
 - 公开地址 (`MAILQUAY_PUBLIC_URL`), CORS (`MAILQUAY_CORS_ORIGINS`), 可信代理 (`MAILQUAY_TRUSTED_PROXIES`) 和非安全传输豁免 (`MAILQUAY_INSECURE_ALLOW`) 只通过环境变量配置, 不写入 `settings` 表, 也不在网页中修改.
 - 非 HTTPS 且不命中豁免域名/CIDR 时, 前端顶部显示全宽红色提醒条, 不可关闭, 不可隐藏.
@@ -63,6 +64,7 @@
 - 已发送只拉取, 不回写标志, 移动和删除; 草稿和发件队列默认只存在 MailQuay 后端.
 - 支持定时发送: `scheduled_at` 存 UTC, 到期前不连接 SMTP; 编辑草稿取消定时.
 - 自动重试次数由设置 `send_retry_limit` 控制, 默认 3; 永久错误不重试.
+- 手动重试只允许 `failed` 状态; `sent`, `cancelled`, `scheduled` 返回 `409`, 不得重新入队.
 - 草稿本地自动保存用 2 秒防抖, 最长 10 秒; 输入过程中不得写远端 IMAP.
 - 草稿同步默认 `pull`, 草稿夹可见时低频拉取; `mirror` 才推送, 且在停止输入 30 秒, 关闭窗口或手动保存时执行.
 - 草稿推送前比较内容哈希, 未变化不发 `APPEND`; 发送成功后删除关联远端草稿.
