@@ -117,6 +117,19 @@ func (s *Server) internal(w http.ResponseWriter, r *http.Request, err error) {
 	s.error(w, r, http.StatusInternalServerError, "internal_error", "An unexpected error occurred.")
 }
 
+// safeMessage returns err's text only when it carries one of the typed
+// user-facing errors; anything else (database, file, IMAP) is logged and
+// replaced by a fixed fallback so internal detail never reaches the client.
+func (s *Server) safeMessage(r *http.Request, err error, fallback string, exposed ...error) string {
+	for _, target := range exposed {
+		if errors.Is(err, target) {
+			return err.Error()
+		}
+	}
+	s.logger.Error("request failed", "path", r.URL.Path, "error", err)
+	return fallback
+}
+
 func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)

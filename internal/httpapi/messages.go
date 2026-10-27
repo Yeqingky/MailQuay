@@ -42,7 +42,7 @@ func (s *Server) ListMessages(w http.ResponseWriter, r *http.Request, params oap
 	}
 	rows, next, err := s.messages.List(r.Context(), opts)
 	if err != nil {
-		if strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "unknown view") || strings.Contains(err.Error(), "cursor") {
+		if errors.Is(err, message.ErrInvalidQuery) {
 			s.error(w, r, http.StatusBadRequest, "invalid_query", err.Error())
 			return
 		}
@@ -227,7 +227,7 @@ func (s *Server) MoveMessage(w http.ResponseWriter, r *http.Request, id oapi.Mes
 		if mapAccountError(err, w, r, s) {
 			return
 		}
-		s.error(w, r, http.StatusBadRequest, "move_failed", err.Error())
+		s.error(w, r, http.StatusBadRequest, "move_failed", s.safeMessage(r, err, "The message could not be moved.", message.ErrInvalidTarget))
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -264,7 +264,7 @@ func (s *Server) ArchiveMessage(w http.ResponseWriter, r *http.Request, id oapi.
 		if mapAccountError(err, w, r, s) {
 			return
 		}
-		s.error(w, r, http.StatusServiceUnavailable, "archive_failed", err.Error())
+		s.error(w, r, http.StatusServiceUnavailable, "archive_failed", s.safeMessage(r, err, "The message could not be archived."))
 		return
 	}
 	writeJSON(w, http.StatusCreated, mapArchive(entry))

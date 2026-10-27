@@ -18,6 +18,10 @@ import (
 	"github.com/mailquay/mailquay/internal/store/sqlcgen"
 )
 
+// ErrInvalidSettings marks patch values that failed validation. Only errors
+// carrying it are safe to show to the client.
+var ErrInvalidSettings = errors.New("invalid settings")
+
 // Values holds every runtime-editable preference. Secrets are kept separately
 // and never serialized.
 type Values struct {
@@ -328,7 +332,7 @@ func (s *Service) Update(ctx context.Context, patch map[string]json.RawMessage) 
 		}
 	}
 	if err := validate(next); err != nil {
-		return Snapshot{}, err
+		return Snapshot{}, fmt.Errorf("%w: %v", ErrInvalidSettings, err)
 	}
 	for key := range patch {
 		if isSecretKey(key) {

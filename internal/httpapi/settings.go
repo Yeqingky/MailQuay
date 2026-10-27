@@ -32,7 +32,7 @@ func (s *Server) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	snap, err := s.settings.Update(r.Context(), patch)
 	if err != nil {
-		s.error(w, r, http.StatusBadRequest, "invalid_settings", err.Error())
+		s.error(w, r, http.StatusBadRequest, "invalid_settings", s.safeMessage(r, err, "The settings could not be saved.", settings.ErrInvalidSettings))
 		return
 	}
 	writeJSON(w, http.StatusOK, mapSettings(snap))

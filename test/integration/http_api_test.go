@@ -246,7 +246,16 @@ func TestHTTPAuthAndAccountFlow(t *testing.T) {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("invalid settings patch %d: %s", resp.StatusCode, body)
 	}
+	var invalidSettings map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&invalidSettings); err != nil {
+		t.Fatal(err)
+	}
 	resp.Body.Close()
+	settingsDetail, _ := invalidSettings["error"].(map[string]any)
+	messageText, _ := settingsDetail["message"].(string)
+	if !strings.Contains(messageText, "sendRetryLimit") {
+		t.Fatalf("invalid settings message = %q", messageText)
+	}
 	var after string
 	if err := conn.QueryRow(ctx, "SELECT value::text FROM settings WHERE key = 'google_client_secret'").Scan(&after); err != nil {
 		t.Fatal(err)

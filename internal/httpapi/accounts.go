@@ -42,7 +42,7 @@ func (s *Server) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	acct, err := s.accounts.Create(r.Context(), in)
 	if err != nil {
-		s.error(w, r, http.StatusBadRequest, "account_invalid", err.Error())
+		s.error(w, r, http.StatusBadRequest, "account_invalid", s.safeMessage(r, err, "The account settings are invalid.", account.ErrInvalidInput))
 		return
 	}
 	writeJSON(w, http.StatusCreated, mapAccount(acct))
@@ -82,7 +82,7 @@ func (s *Server) UpdateAccount(w http.ResponseWriter, r *http.Request, id oapi.A
 			s.error(w, r, http.StatusNotFound, "not_found", "Account not found.")
 			return
 		}
-		s.error(w, r, http.StatusBadRequest, "account_invalid", err.Error())
+		s.error(w, r, http.StatusBadRequest, "account_invalid", s.safeMessage(r, err, "The account settings are invalid.", account.ErrInvalidInput))
 		return
 	}
 	writeJSON(w, http.StatusOK, mapAccount(acct))

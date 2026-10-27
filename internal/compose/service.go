@@ -35,6 +35,9 @@ var (
 	ErrRevisionConflict = errors.New("draft revision conflict")
 	// ErrInvalidDraft is returned for invalid compose input.
 	ErrInvalidDraft = errors.New("invalid draft")
+	// ErrInvalidUpload marks upload payloads rejected for size or lookup
+	// reasons. Only errors carrying it are safe to show to the client.
+	ErrInvalidUpload = errors.New("invalid upload")
 )
 
 // DraftInput is the editable draft payload.
@@ -221,7 +224,7 @@ func (s *Service) Send(ctx context.Context, in SendInput) (sqlcgen.Outbox, error
 		return sqlcgen.Outbox{}, err
 	}
 	if draft.Status == "sent" {
-		return sqlcgen.Outbox{}, errors.New("draft was already sent")
+		return sqlcgen.Outbox{}, fmt.Errorf("%w: draft was already sent", ErrInvalidDraft)
 	}
 	if err := s.validateAccount(ctx, draft.AccountID); err != nil {
 		return sqlcgen.Outbox{}, err
@@ -229,7 +232,7 @@ func (s *Service) Send(ctx context.Context, in SendInput) (sqlcgen.Outbox, error
 	var hd draftHeaders
 	_ = json.Unmarshal(draft.Headers, &hd)
 	if len(hd.To) == 0 && len(hd.Cc) == 0 && len(hd.Bcc) == 0 {
-		return sqlcgen.Outbox{}, errors.New("draft has no recipients")
+		return sqlcgen.Outbox{}, fmt.Errorf("%w: draft has no recipients", ErrInvalidDraft)
 	}
 	acct, err := s.accounts.Get(ctx, draft.AccountID)
 	if err != nil {
@@ -338,7 +341,7 @@ func (s *Service) resolveAttachments(ctx context.Context, ids []uuid.UUID) (json
 		return nil, err
 	}
 	if len(rows) != len(ids) {
-		return nil, errors.New("one or more attachments were not found")
+		return nil, fmt.Errorf("%w: one or more attachments were not found", ErrInvalidDraft)
 	}
 	out := make([]DraftAttachment, 0, len(rows))
 	for _, row := range rows {
@@ -354,7 +357,7 @@ func (s *Service) resolveAttachments(ctx context.Context, ids []uuid.UUID) (json
 // Upload stores an attachment and returns its metadata.
 func (s *Service) Upload(ctx context.Context, filename, contentType string, data []byte) (sqlcgen.UploadedAttachment, error) {
 	if limit := s.settings.MaxAttachmentBytes(); int64(len(data)) > limit {
-		return sqlcgen.UploadedAttachment{}, fmt.Errorf("attachment exceeds the %d byte limit", limit)
+		return sqlcgen.UploadedAttachment{}, fmt.Errorf("%w: attachment exceeds the %d byte limit", ErrInvalidUpload, limit)
 	}
 	sha, err := s.blobs.PutBlob(data)
 	if err != nil {

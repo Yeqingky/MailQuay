@@ -29,6 +29,11 @@ var (
 	ErrNoDeleteTarget = errors.New("no trash folder is configured for this account")
 	// ErrContentUnavailable means the body could not be fetched.
 	ErrContentUnavailable = errors.New("message content unavailable")
+	// ErrInvalidQuery marks list parameters rejected for being incomplete or
+	// malformed. Only errors carrying it are safe to show to the client.
+	ErrInvalidQuery = errors.New("invalid query")
+	// ErrInvalidTarget marks move targets that belong to another account.
+	ErrInvalidTarget = errors.New("invalid target mailbox")
 )
 
 // Body is the presentation form of a message body.
@@ -85,7 +90,7 @@ func (s *Service) List(ctx context.Context, opts ListOptions) ([]sqlcgen.Message
 	}
 	received, id, err := DecodeCursor(opts.Cursor)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("%w: %v", ErrInvalidQuery, err)
 	}
 	var cursorReceived *time.Time
 	var cursorID *uuid.UUID
@@ -98,7 +103,7 @@ func (s *Service) List(ctx context.Context, opts ListOptions) ([]sqlcgen.Message
 	switch opts.View {
 	case "mailbox":
 		if opts.MailboxID == nil {
-			return nil, "", errors.New("mailboxId is required for the mailbox view")
+			return nil, "", fmt.Errorf("%w: mailboxId is required for the mailbox view", ErrInvalidQuery)
 		}
 		rows, err := s.store.ListMailboxMessages(ctx, sqlcgen.ListMailboxMessagesParams{
 			MailboxID: *opts.MailboxID, CursorReceived: cursorReceived, CursorID: cursorID, PageLimit: limit,
@@ -153,7 +158,7 @@ func (s *Service) List(ctx context.Context, opts ListOptions) ([]sqlcgen.Message
 			items = append(items, messageFromRoleRow(row))
 		}
 	default:
-		return nil, "", fmt.Errorf("unknown view %q", opts.View)
+		return nil, "", fmt.Errorf("%w: unknown view %q", ErrInvalidQuery, opts.View)
 	}
 	next := ""
 	if len(items) > opts.Limit {
@@ -286,7 +291,7 @@ func (s *Service) Move(ctx context.Context, id, mailboxID uuid.UUID) error {
 		return fmt.Errorf("load target mailbox: %w", err)
 	}
 	if target.AccountID != msg.AccountID {
-		return errors.New("target mailbox belongs to another account")
+		return fmt.Errorf("%w: target mailbox belongs to another account", ErrInvalidTarget)
 	}
 	acct, err := s.store.GetAccount(ctx, msg.AccountID)
 	if err != nil {

@@ -45,7 +45,7 @@ func (s *Server) CreateDraft(w http.ResponseWriter, r *http.Request) {
 	}
 	row, err := s.compose.Create(r.Context(), in)
 	if err != nil {
-		s.error(w, r, http.StatusBadRequest, "invalid_draft", err.Error())
+		s.error(w, r, http.StatusBadRequest, "invalid_draft", s.safeMessage(r, err, "The draft is invalid.", compose.ErrInvalidDraft))
 		return
 	}
 	writeJSON(w, http.StatusCreated, mapDraft(row))
@@ -97,7 +97,7 @@ func (s *Server) UpdateDraft(w http.ResponseWriter, r *http.Request, id openapiU
 		case errors.Is(err, compose.ErrNotFound):
 			s.error(w, r, http.StatusNotFound, "not_found", "Draft not found.")
 		default:
-			s.error(w, r, http.StatusBadRequest, "invalid_draft", err.Error())
+			s.error(w, r, http.StatusBadRequest, "invalid_draft", s.safeMessage(r, err, "The draft is invalid.", compose.ErrInvalidDraft))
 		}
 		return
 	}
@@ -127,7 +127,7 @@ func (s *Server) SyncDraft(w http.ResponseWriter, r *http.Request, id openapiUUI
 		return
 	}
 	if err := s.compose.SyncDraft(r.Context(), draftID); err != nil {
-		s.error(w, r, http.StatusBadGateway, "draft_sync_failed", err.Error())
+		s.error(w, r, http.StatusBadGateway, "draft_sync_failed", s.safeMessage(r, err, "The draft could not be synced."))
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
@@ -148,7 +148,7 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 		DraftID: draftID, ScheduledAt: body.ScheduledAt,
 	})
 	if err != nil {
-		s.error(w, r, http.StatusBadRequest, "send_failed", err.Error())
+		s.error(w, r, http.StatusBadRequest, "send_failed", s.safeMessage(r, err, "The message could not be queued.", compose.ErrInvalidDraft, compose.ErrNotFound))
 		return
 	}
 	writeJSON(w, http.StatusAccepted, mapOutbox(out))
@@ -191,7 +191,7 @@ func (s *Server) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 	}
 	row, err := s.compose.Upload(r.Context(), header.Filename, contentType, data)
 	if err != nil {
-		s.error(w, r, http.StatusBadRequest, "upload_failed", err.Error())
+		s.error(w, r, http.StatusBadRequest, "upload_failed", s.safeMessage(r, err, "The attachment could not be stored.", compose.ErrInvalidUpload))
 		return
 	}
 	writeJSON(w, http.StatusCreated, oapi.UploadedAttachment{
@@ -232,7 +232,7 @@ func (s *Server) RescheduleOutbox(w http.ResponseWriter, r *http.Request, id ope
 		if mapAccountError(err, w, r, s) {
 			return
 		}
-		s.error(w, r, http.StatusBadRequest, "reschedule_failed", err.Error())
+		s.error(w, r, http.StatusBadRequest, "reschedule_failed", s.safeMessage(r, err, "The message could not be rescheduled.", compose.ErrNotFound))
 		return
 	}
 	writeJSON(w, http.StatusOK, mapOutbox(row))

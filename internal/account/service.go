@@ -28,6 +28,10 @@ import (
 // ErrNotFound is returned when an account does not exist.
 var ErrNotFound = errors.New("account not found")
 
+// ErrInvalidInput marks account payloads that failed validation. Only errors
+// carrying it are safe to show to the client.
+var ErrInvalidInput = errors.New("invalid account")
+
 // Input is the editable account shape.
 type Input struct {
 	Name               string
@@ -132,7 +136,7 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (sqlcgen.Account, error
 func (s *Service) Create(ctx context.Context, in Input) (sqlcgen.Account, error) {
 	normalized, err := s.normalize(in, true)
 	if err != nil {
-		return sqlcgen.Account{}, err
+		return sqlcgen.Account{}, fmt.Errorf("%w: %v", ErrInvalidInput, err)
 	}
 	autoDetect := true
 	if normalized.AutoDetectSpecialFolders != nil {
@@ -208,7 +212,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in Input) (sqlcgen.A
 	}
 	normalized, err := s.normalize(in, false)
 	if err != nil {
-		return sqlcgen.Account{}, err
+		return sqlcgen.Account{}, fmt.Errorf("%w: %v", ErrInvalidInput, err)
 	}
 	params := sqlcgen.UpdateAccountParams{
 		ID:                       id,

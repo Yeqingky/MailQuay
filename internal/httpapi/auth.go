@@ -53,7 +53,7 @@ func (s *Server) SetupOwner(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, auth.ErrSetupClosed):
 			s.error(w, r, http.StatusConflict, "setup_closed", "The owner account already exists.")
 		default:
-			s.error(w, r, http.StatusBadRequest, "setup_failed", err.Error())
+			s.error(w, r, http.StatusBadRequest, "setup_failed", "Setup failed.")
 		}
 		return
 	}
@@ -113,7 +113,7 @@ func (s *Server) ChangePassword(w http.ResponseWriter, r *http.Request) {
 			s.error(w, r, http.StatusUnauthorized, "invalid_credentials", "The current password is incorrect.")
 			return
 		}
-		s.error(w, r, http.StatusBadRequest, "password_change_failed", err.Error())
+		s.error(w, r, http.StatusBadRequest, "password_change_failed", "The password could not be changed.")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
