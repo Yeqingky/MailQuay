@@ -380,7 +380,7 @@ docker compose -f docker-compose-dev.yml up -d --build
 - 前端在构建镜像时编译; 修改 `frontend` 或后端代码后重新执行带 `--build` 的启动命令.
 - 数据目录使用宿主机绑定挂载: 数据库为 `../pg_data` (uid 70, 权限 750), 运行数据为 `../data/dev` (uid 100). 首次启动前创建并 chown, 否则容器用户无法写入.
 - 修改前端依赖后重新构建镜像, 不需要在宿主机执行 `pnpm install`.
-- 默认数据库密码和主密钥只用于本地; 暴露到其他主机前必须覆盖 `POSTGRES_PASSWORD` 和 `MAILQUAY_SECRET_KEY`.
+- `POSTGRES_PASSWORD` 有开发默认值; `MAILQUAY_SECRET_KEY` 没有默认值, 启动前必须在 `.env` 或环境中设置为 32 字节随机值的 base64 (如 `openssl rand -base64 32`), 缺失时 Compose 直接报错.
 - 开发栈的库名由 `.env` 的 `MAILQUAY_DB_NAME` 控制, 默认 `mailquay`. 需要干净的数据库时执行 `scripts/new-database.sh [库名]`: 脚本创建新库, 应用迁移, 写入 `.env` 并重建应用容器; 旧库保留在同一个 PostgreSQL 实例中, 把 `MAILQUAY_DB_NAME` 改回去即可恢复.
 - Windows 和 macOS 用户使用独立二进制, 不使用容器.
 - Compose 示例固定到具体版本, 不覆盖用户已有 `.env`.

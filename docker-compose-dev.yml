@@ -10,8 +10,9 @@
 # Usage (from the MailQuay directory):
 #   docker compose -f docker-compose-dev.yml up -d --build
 #
-# Defaults are development-only. Override POSTGRES_PASSWORD,
-# MAILQUAY_SECRET_KEY and MAILQUAY_PUBLIC_URL before exposing this stack.
+# Defaults are development-only. MAILQUAY_SECRET_KEY has no default and must be
+# set (base64 of 32 random bytes, e.g. `openssl rand -base64 32`) in `.env` or the
+# environment before starting the stack.
 
 services:
   postgres:
@@ -56,7 +57,7 @@ services:
       # scripts/new-database.sh switches this name; the previous database is kept.
       MAILQUAY_DATABASE_URL: postgres://mailquay:${POSTGRES_PASSWORD:-mailquay-dev}@postgres:5432/${MAILQUAY_DB_NAME:-mailquay}?sslmode=disable
       MAILQUAY_DATA_DIR: /data
-      MAILQUAY_SECRET_KEY: ${MAILQUAY_SECRET_KEY:-ZGV2LW9ubHkta2V5LTAxMjM0NTY3ODlhYmNkZWZYWVo=}
+      MAILQUAY_SECRET_KEY: ${MAILQUAY_SECRET_KEY:?set MAILQUAY_SECRET_KEY to the base64 of 32 random bytes}
       MAILQUAY_TRUSTED_PROXIES: ${MAILQUAY_TRUSTED_PROXIES:-172.16.0.0/12}
       MAILQUAY_CORS_ORIGINS: ${MAILQUAY_CORS_ORIGINS:-}
       MAILQUAY_INSECURE_ALLOW: ${MAILQUAY_INSECURE_ALLOW:-}
