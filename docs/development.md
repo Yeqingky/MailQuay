@@ -105,7 +105,7 @@ go run ./cmd/mailquay search reindex --all
 | `MAILQUAY_DATA_DIR` | 否 | `./data` | blob, 正文文本缓存, Bleve 索引与临时文件目录 |
 | `MAILQUAY_SEARCH_PATH` | 否 | `$MAILQUAY_DATA_DIR/search` | Bleve 索引目录 |
 | `MAILQUAY_SECRET_KEY` | 是 | 无 | 32 字节随机值的 base64, 用于字段加密 |
-| `MAILQUAY_SETUP_TOKEN` | 否 | 首次启动随机生成 | 首次创建所有者账号的一次性 token |
+| `MAILQUAY_SETUP_TOKEN` | 否 | 首次启动随机生成 | 首次创建所有者账号的一次性 token, 自定义值至少 16 字符 |
 | `MAILQUAY_LOG_LEVEL` | 否 | `info` | 启动日志级别, 之后可在网页中修改 |
 | `MAILQUAY_LOG_FORMAT` | 否 | `text` | `text` 或 `json` |
 | `MAILQUAY_TRUSTED_PROXIES` | 否 | 空 | 可信代理 CIDR, 逗号分隔 |

@@ -634,7 +634,7 @@ HTTP 层注意:
 - 首次启动进入 `/setup`, 创建唯一所有者账号, 只设置用户名和密码, 密码使用 Argon2id 哈希.
 - 登录页为 `/login`, 只使用用户名和密码; 不做邮箱绑定, 不发送邮件验证码, 不做邮件验证链接.
 - 第三方 OAuth2 登录 (例如代码托管平台的 OAuth) 是后续独立功能, 与邮箱账号的 OAuth2 授权互不影响.
-- 首次启动生成一次性 setup token 并写入数据目录的 `setup-token` 文件 (`0600`), 日志只记录文件路径; 也可以用 `MAILQUAY_SETUP_TOKEN` 预先指定. `/setup` 必须提交该 token, 初始化完成后立即失效; 未初始化时除 `/auth/setup` 和健康检查外的 API 返回 `409`.
+- 首次启动生成一次性 setup token 并写入数据目录的 `setup-token` 文件 (`0600`), 日志只记录文件路径; 也可以用 `MAILQUAY_SETUP_TOKEN` 预先指定. `/setup` 必须提交该 token, 初始化完成后立即失效; `MAILQUAY_SETUP_TOKEN` 至少 16 字符; `/auth/setup` 按 IP 限流; 未初始化时除 `/auth/setup` 和健康检查外的 API 返回 `409`.
 - 登录成功后生成 32 字节随机会话令牌, 数据库只保存 SHA-256 摘要.
 - Cookie 设置 `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`. `Secure` 在生产 HTTPS 下强制; 本地开发只允许 loopback 上的 HTTP 例外.
 - 会话默认 7 天, 活动时滑动续期; 会话 Cookie 与 CSRF Cookie 同步续期; 修改密码撤销全部会话.

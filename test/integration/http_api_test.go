@@ -66,6 +66,27 @@ func TestHTTPAuthAndAccountFlow(t *testing.T) {
 		t.Fatalf("setup status %d: %s", resp.StatusCode, body)
 	}
 	resp.Body.Close()
+	// Setup is rate limited per IP so a weak configured token cannot be
+	// brute-forced online.
+	limited := false
+	for range 12 {
+		resp = postJSON(t, client, base+"/auth/setup", map[string]any{
+			"token": "wrong-token", "username": "intruder", "password": "supersecret1",
+		}, "")
+		status := resp.StatusCode
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if status == http.StatusTooManyRequests {
+			limited = true
+			break
+		}
+		if status != http.StatusBadRequest {
+			t.Fatalf("setup attempt status %d: %s", status, body)
+		}
+	}
+	if !limited {
+		t.Fatal("repeated setup attempts were never rate limited")
+	}
 	csrf := csrfFromJar(t, jar, server.URL)
 	me := getJSON(t, client, base+"/auth/me")
 	user, _ := me["user"].(map[string]any)

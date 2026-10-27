@@ -50,22 +50,24 @@ type Session struct {
 
 // Service implements owner authentication.
 type Service struct {
-	store      *store.Store
-	settings   *settings.Service
-	logger     *slog.Logger
-	setupToken string
-	limiter    *limiter
-	mu         sync.Mutex
+	store        *store.Store
+	settings     *settings.Service
+	logger       *slog.Logger
+	setupToken   string
+	limiter      *limiter
+	setupLimiter *limiter
+	mu           sync.Mutex
 }
 
 // NewService creates the authentication service.
 func NewService(st *store.Store, settingsSvc *settings.Service, logger *slog.Logger, setupToken string) *Service {
 	return &Service{
-		store:      st,
-		settings:   settingsSvc,
-		logger:     logger,
-		setupToken: setupToken,
-		limiter:    newLimiter(10, time.Minute),
+		store:        st,
+		settings:     settingsSvc,
+		logger:       logger,
+		setupToken:   setupToken,
+		limiter:      newLimiter(10, time.Minute),
+		setupLimiter: newLimiter(10, time.Minute),
 	}
 }
 
@@ -94,8 +96,12 @@ func (s *Service) consumeSetupToken(token string) bool {
 	return true
 }
 
-// Setup creates the owner account and a session.
-func (s *Service) Setup(ctx context.Context, token, username, password, userAgent string) (*Session, error) {
+// Setup creates the owner account and a session. Attempts are rate limited per
+// client IP so a weak configured token cannot be brute-forced online.
+func (s *Service) Setup(ctx context.Context, token, username, password, userAgent, ip string) (*Session, error) {
+	if !s.setupLimiter.Allow(ip) {
+		return nil, ErrRateLimited
+	}
 	if !s.consumeSetupToken(token) {
 		return nil, ErrInvalidSetupToken
 	}

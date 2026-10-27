@@ -45,9 +45,11 @@ func (s *Server) SetupOwner(w http.ResponseWriter, r *http.Request) {
 		s.error(w, r, http.StatusBadRequest, "invalid_request", "Malformed request body.")
 		return
 	}
-	sess, err := s.auth.Setup(r.Context(), body.Token, body.Username, body.Password, r.UserAgent())
+	sess, err := s.auth.Setup(r.Context(), body.Token, body.Username, body.Password, r.UserAgent(), auth.ClientIP(r, s.cfg.TrustedProxies))
 	if err != nil {
 		switch {
+		case errors.Is(err, auth.ErrRateLimited):
+			s.error(w, r, http.StatusTooManyRequests, "rate_limited", "Too many attempts. Try again later.")
 		case errors.Is(err, auth.ErrInvalidSetupToken):
 			s.error(w, r, http.StatusBadRequest, "invalid_setup_token", "The setup token is invalid.")
 		case errors.Is(err, auth.ErrSetupClosed):
