@@ -213,6 +213,27 @@ func TestHTTPAuthAndAccountFlow(t *testing.T) {
 	if concurrency["searchConcurrency"] != float64(2) || concurrency["indexBatchSize"] != float64(120) {
 		t.Fatalf("manual local pools not applied: %+v", concurrency)
 	}
+	// JSON handlers must reject bodies without a JSON content type.
+	plainReq, err := http.NewRequest(http.MethodPatch, base+"/settings", strings.NewReader(`{"logLevel":"info"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plainReq.Header.Set("Content-Type", "text/plain")
+	plainReq.Header.Set("X-CSRF-Token", csrf)
+	plain, err := client.Do(plainReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain.Body.Close()
+	if plain.StatusCode != http.StatusUnsupportedMediaType {
+		t.Fatalf("text/plain body status = %d, want 415", plain.StatusCode)
+	}
+	resp = sendJSON(t, client, http.MethodPatch, base+"/settings", map[string]any{"logLevel": "info"}, csrf)
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("json settings patch %d: %s", resp.StatusCode, body)
+	}
+	resp.Body.Close()
 	oauth, _ := settings["oauth"].(map[string]any)
 	_ = oauth
 	loginResp := sendJSON(t, client, http.MethodPost, base+"/auth/login", map[string]any{

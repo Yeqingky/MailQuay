@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"log/slog"
+	"mime"
 	"net/http"
 	"net/url"
 	"strings"
@@ -34,6 +35,7 @@ func NewRouter(srv *Server, hub *events.Hub, logger *slog.Logger) http.Handler {
 	api := chi.NewRouter()
 	api.Use(noStore, srv.sessionMiddleware)
 	api.Use(srv.csrfMiddleware)
+	api.Use(srv.jsonBodyMiddleware)
 	oapi.HandlerFromMux(srv, api)
 	router.Mount("/api/v1", api)
 
@@ -239,6 +241,34 @@ func cookieMaxAge(expires time.Time) int {
 		return 0
 	}
 	return maxAge
+}
+
+// jsonBodyMiddleware rejects non-JSON request bodies so a handler can never
+// decode form or text payloads by accident. Multipart uploads and requests
+// without a body are exempt.
+func (s *Server) jsonBodyMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet, http.MethodHead, http.MethodOptions:
+			next.ServeHTTP(w, r)
+			return
+		}
+		if r.ContentLength == 0 {
+			next.ServeHTTP(w, r)
+			return
+		}
+		switch apiPath(r.URL.Path) {
+		case "/attachments", "/accounts/import/emclient":
+			next.ServeHTTP(w, r)
+			return
+		}
+		mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		if err != nil || !strings.EqualFold(mediaType, "application/json") {
+			s.error(w, r, http.StatusUnsupportedMediaType, "unsupported_media_type", "Content-Type must be application/json.")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) csrfMiddleware(next http.Handler) http.Handler {
