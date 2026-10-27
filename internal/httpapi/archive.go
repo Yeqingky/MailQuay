@@ -4,7 +4,6 @@ import (
 	"errors"
 	"mime"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -167,11 +166,7 @@ func (s *Server) GetArchiveBody(w http.ResponseWriter, r *http.Request, id opena
 		})
 	}
 	writeJSON(w, http.StatusOK, oapi.MessageBody{
-		Html: parsed.HTML, Text: parsed.Text, RemoteImagesBlocked: containsRemoteImage(parsed.HTML),
+		Html: parsed.HTML, Text: parsed.Text, RemoteImagesBlocked: mailmime.HasRemoteImage(parsed.HTML),
 		FetchedFromServer: boolPtr(false), Attachments: attachments,
 	})
-}
-
-func containsRemoteImage(html string) bool {
-	return strings.Contains(html, "data-src=")
 }

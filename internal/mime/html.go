@@ -46,11 +46,8 @@ func buildMailPolicy() *bluemonday.Policy {
 	p.AllowStyles(mailStyles...).Globally()
 	p.AllowURLSchemes("cid", "data", "http", "https")
 
-	// Explicitly keep the image attributes the reader needs after src moves to
-	// data-src.
+	// Keep the image attributes the reader needs for layout and placeholders.
 	p.AllowAttrs("alt", "title").OnElements("img")
-	p.AllowAttrs("width", "height").Matching(bluemonday.NumberOrPercent).OnElements("img")
-
 	// Table layout attributes carry centering, widths and spacing in mail HTML.
 	// Stripping them collapses otherwise valid templates.
 	layoutElements := []string{"table", "thead", "tbody", "tfoot", "tr", "td", "th"}
@@ -75,16 +72,15 @@ func buildMailPolicy() *bluemonday.Policy {
 }
 
 var (
-	cssURL     = regexp.MustCompile(`(?i)url\(\s*['"]?([^'")]+?)['"]?\s*\)`)
 	cssImport  = regexp.MustCompile(`(?is)@import[^;]*;`)
 	cssUnsafe  = []string{"expression(", "javascript:", "vbscript:", "behavior:", "-moz-binding"}
 	styleBlock = regexp.MustCompile(`(?is)<style[^>]*>([\s\S]*?)</style>`)
 	rootStyle  = regexp.MustCompile(`(?is)<(?:html|body)\b[^>]*?style\s*=\s*(?:"([^"]*)"|'([^']*)')`)
 )
 
-// sanitizeCSS keeps layout rules from mail style blocks while removing remote
-// loads and active CSS constructs. Remote backgrounds and imports would leak
-// requests even when the reader has not allowed remote images.
+// sanitizeCSS keeps layout rules from mail style blocks while removing active
+// CSS constructs. Resource URLs stay in place: the reader applies the remote
+// image policy when it renders the message.
 // rootBackgroundCSS lifts background declarations from the html and body tags.
 // Sanitizing a full document drops those tags, which would otherwise lose the
 // page-level background color used by mail templates.
@@ -111,16 +107,6 @@ func rootBackgroundCSS(raw string) string {
 func sanitizeCSS(css string) string {
 	css = strings.NewReplacer("<", "", ">", "").Replace(css)
 	css = cssImport.ReplaceAllString(css, "")
-	css = cssURL.ReplaceAllStringFunc(css, func(match string) string {
-		parts := cssURL.FindStringSubmatch(match)
-		if len(parts) < 2 {
-			return "none"
-		}
-		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(parts[1])), "data:image/") {
-			return match
-		}
-		return "none"
-	})
 	declarations := strings.Split(css, ";")
 	kept := declarations[:0]
 	for _, declaration := range declarations {
@@ -139,9 +125,9 @@ func sanitizeCSS(css string) string {
 	return strings.Join(kept, ";")
 }
 
-// SanitizeHTML applies an allowlist policy and then rewrites every resource URL
-// into an inert data-src attribute. Links open in a new tab without leaking a
-// referrer. The output never contains active content or remote loads.
+// SanitizeHTML applies an allowlist policy and lifts style blocks. Links open
+// in a new tab without leaking a referrer. Resource URLs are kept so the
+// reader can apply its remote image policy at render time.
 func SanitizeHTML(raw string) string {
 	if strings.TrimSpace(raw) == "" {
 		return ""
@@ -218,10 +204,7 @@ func rewriteElement(node *html.Node) {
 	if node.Data == "img" {
 		if src, ok := attribute(node, "src"); ok {
 			lower := strings.ToLower(strings.TrimSpace(src))
-			if strings.HasPrefix(lower, "data:") && !strings.HasPrefix(lower, "data:image/") {
-				removeAttribute(node, "src")
-			} else {
-				setAttribute(node, "data-src", src)
+			if src == "" || (strings.HasPrefix(lower, "data:") && !strings.HasPrefix(lower, "data:image/")) {
 				removeAttribute(node, "src")
 			}
 		}
@@ -229,22 +212,12 @@ func rewriteElement(node *html.Node) {
 	}
 
 	if style, ok := attribute(node, "style"); ok && style != "" {
-		cleanStyle, urls := extractCSSURLs(style)
-		if len(urls) > 0 {
-			if dataSrc, exists := attribute(node, "data-src"); !exists || dataSrc == "" {
-				setAttribute(node, "data-src", urls[0])
-			}
-		}
+		cleanStyle := sanitizeCSS(style)
 		if cleanStyle == "" {
 			removeAttribute(node, "style")
 		} else {
 			setAttribute(node, "style", cleanStyle)
 		}
-	}
-
-	if background, ok := attribute(node, "background"); ok && background != "" {
-		setAttribute(node, "data-background-src", background)
-		removeAttribute(node, "background")
 	}
 
 	if node.Data == "a" {
@@ -254,25 +227,6 @@ func rewriteElement(node *html.Node) {
 		setAttribute(node, "target", "_blank")
 		setAttribute(node, "rel", "noopener noreferrer")
 	}
-}
-
-func extractCSSURLs(style string) (string, []string) {
-	var kept []string
-	var urls []string
-	for _, declaration := range strings.Split(style, ";") {
-		declaration = strings.TrimSpace(declaration)
-		if declaration == "" {
-			continue
-		}
-		if matches := cssURL.FindStringSubmatch(declaration); len(matches) > 1 {
-			if url := strings.TrimSpace(matches[1]); url != "" {
-				urls = append(urls, url)
-			}
-			continue
-		}
-		kept = append(kept, declaration)
-	}
-	return strings.Join(kept, "; "), urls
 }
 
 func attribute(node *html.Node, name string) (string, bool) {
@@ -379,4 +333,12 @@ func normalizeText(text string) string {
 		cleaned = cleaned[:len(cleaned)-1]
 	}
 	return strings.Join(cleaned, "\n")
+}
+
+var remoteResource = regexp.MustCompile(`(?i)(?:src|background)\s*=\s*(?:&#34;|&#39;|["'])?(?:https?:)?//|url\(\s*(?:&#34;|&#39;|["'])?\s*(?:https?:)?//`)
+
+// HasRemoteImage reports whether sanitized HTML references remote images. The
+// reader blocks those until the sender is explicitly allowed.
+func HasRemoteImage(raw string) bool {
+	return remoteResource.MatchString(raw)
 }

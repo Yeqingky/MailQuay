@@ -166,14 +166,17 @@ pnpm generate:api
 - 组件不直接 `fetch`, 统一使用 `lib/api/client.ts`.
 - 接口类型来自生成的 `schema.d.ts`, 不手写重复类型.
 - 乐观更新必须有失败回滚和用户可见提示.
-- 更新成功写回缓存时必须合并已有详情; 已读/标记响应省略附件或返回空附件列表时保留已有非空附件; 阅读器详情无附件时从正文响应恢复内嵌图片元数据.
-- HTML 邮件必须经 DOMPurify 清洗并放入不带 `allow-scripts` 的 sandbox iframe; 后端 CSP 的 `frame-src` 必须允许 `about:` 以加载受 sandbox 保护的 `srcdoc` 正文.
-- 默认阻止远程图片和外链样式, 链接必须带 `rel="noopener noreferrer"`; 邮件自带的内联 `<style>` 块可以保留, 但必须移除 `@import`, 远程 `url()` 和可执行 CSS.
+- 更新成功写回缓存时必须合并已有详情; 已读/标记响应省略附件或返回空附件列表时保留已有非空附件; 阅读器详情无附件时从正文响应恢复内嵌图片元数据; 后台刷新失败时保留已缓存的详情和正文, 只在没有缓存数据时显示错误状态.
+- HTML 邮件必须经 DOMPurify 清洗并放入不带 `allow-scripts` 的 sandbox iframe; 清洗后 HTML 为空时, 阅读器使用转义后的纯文本替代内容; 后端 CSP 的 `frame-src` 必须允许 `about:` 以加载受 sandbox 保护的 `srcdoc` 正文.
+- 后端 `mime.SanitizeHTML` 只做 allowlist 清洗并保留资源 URL, 不改写 `src`, `background` 或 CSS `url()`; 远程资源策略统一由前端 `sanitizeMailHtml` 执行.
+- 阅读器必须在同一次 sanitize 结果中同步取得正文和阻止数量, 提示条和放行按钮由该结果直接驱动, 不得通过子组件 effect 上报计数.
+- 阅读器在首次渲染时就根据发件人放行记录计算 `allowRemoteImages`, 不得先渲染未放行版本再通过 effect 翻转; 正文 iframe 以更新后的文档字符串作为 `key`, 文档变化时重建 iframe, 不依赖修改 `srcdoc` 属性.
+- 默认阻止远程图片和外链样式, 链接必须带 `rel="noopener noreferrer"`; 邮件 `<style>` 块可保留, 但必须移除 `@import`, 非背景远程 CSS URL 和可执行 CSS; 远程 `background` 与背景 `url()` 在未放行时移除并计入阻止数量, 放行发件人后按原地址加载.
 - 阻止远程图片时, 1x1 或 2x2 及更小的跟踪像素直接移除, 不显示占位符也不计入阻止数量.
 - 被阻止的小图标 (宽高都不超过 24px) 直接隐藏但仍计入阻止数量; 其他占位符按原始尺寸显示.
 - HTTPS 页面必须把 `http://` 图片地址升级为 `https://`, 避免混合内容拦截; HTTP 页面保持原地址.
 - 表格的 `align`, `valign`, `width`, `height`, `cellpadding`, `cellspacing`, `border` 和 `bgcolor` 属于邮件布局, 清洗时必须保留.
-- 表格的 `background` 图片地址改写为 `data-background-src`, 用户放行远程图片后再恢复, 未放行时不得请求.
+- 表格的 `background` 图片地址由前端按发件人放行状态保留或移除, 未放行时移除并计入阻止数量.
 - 邮件 `<html>` 和 `<body>` 上的背景声明必须提升到 iframe 根元素, 避免整页背景丢失.
 - 用户可见文案走 i18n, 同时维护 `en` 和 `zh-CN`.
 - 操作结果统一使用右下角通知条, 不在按钮旁或表单内显示成功/失败文字; 同时最多显示 5 条, 在底部同一列叠成一摞, 仅上下错开, 最新的在最上面, 旧通知只露出约 6px 下边缘; 每条左侧是状态图标并垂直居中, 右侧上方标题下方详情; 悬停或键盘聚焦时展开为完整列表并暂停倒计时, 离开后收起并继续; 成功通知 3–4 秒关闭, 普通信息 4–6 秒关闭, 错误通知保留到手动关闭; 展开动画 150–250ms; 移动端底部居中并适配安全区域.

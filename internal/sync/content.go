@@ -104,7 +104,7 @@ func (s *Service) presentBody(ctx context.Context, msg sqlcgen.Message, raw []by
 		return message.Body{}, err
 	}
 	return message.Body{
-		HTML: parsed.HTML, Text: parsed.Text, RemoteImagesBlocked: containsRemoteImage(parsed.HTML),
+		HTML: parsed.HTML, Text: parsed.Text, RemoteImagesBlocked: mime.HasRemoteImage(parsed.HTML),
 		FetchedFromServer: fetched, Attachments: attachments,
 	}, nil
 }
@@ -237,13 +237,4 @@ func (s *Service) fetchRaw(ctx context.Context, acct sqlcgen.Account, msg sqlcge
 		}
 	}
 	return nil, errors.New("message no longer exists on the POP3 server")
-}
-
-func containsRemoteImage(html string) bool {
-	for i := 0; i+4 < len(html); i++ {
-		if (html[i] == 's' || html[i] == 'S') && (html[i+1] == 'r' || html[i+1] == 'R') && (html[i+2] == 'c' || html[i+2] == 'C') {
-			return true
-		}
-	}
-	return false
 }

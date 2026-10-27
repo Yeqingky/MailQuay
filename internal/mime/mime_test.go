@@ -86,11 +86,11 @@ func TestParseMultipart(t *testing.T) {
 	if strings.Contains(parsed.HTML, "<script") || !strings.Contains(parsed.HTML, "<b>world</b>") {
 		t.Errorf("HTML = %q", parsed.HTML)
 	}
-	if !strings.Contains(parsed.HTML, `data-src="https://tracker.example/p.gif"`) {
-		t.Errorf("HTML image URL not rewritten: %q", parsed.HTML)
+	if !strings.Contains(parsed.HTML, `src="https://tracker.example/p.gif"`) {
+		t.Errorf("HTML image source lost: %q", parsed.HTML)
 	}
-	if strings.Contains(parsed.HTML, ` src=`) {
-		t.Errorf("HTML still has a loadable src: %q", parsed.HTML)
+	if strings.Contains(parsed.HTML, "data-src") {
+		t.Errorf("HTML still carries the legacy lazy source: %q", parsed.HTML)
 	}
 
 	if !parsed.HasAttachments || len(parsed.Attachments) != 2 {

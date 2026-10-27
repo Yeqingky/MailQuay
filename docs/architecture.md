@@ -614,7 +614,10 @@ HTTP 层注意:
 - SSE 事件只做缓存失效和局部更新, 不复制完整邮件对象.
 - 未读, 标记, 归档使用乐观更新, 失败时回滚并提示.
 - 邮件列表使用虚拟滚动, 阅读器正文在独立 iframe 中渲染.
-- HTML 邮件先经 DOMPurify 清洗, 再写入 `sandbox` iframe 的 `srcdoc`; 禁止脚本, 表单和顶层导航.
+- HTML 邮件先经 DOMPurify 清洗, 再写入 `sandbox` iframe 的 `srcdoc`; 禁止脚本, 表单和顶层导航. 若清洗后 HTML 为空且纯文本替代存在, 阅读器显示转义后的纯文本.
+- 邮件详情和正文查询在后台刷新失败时保留已缓存的数据, 正文和图片不因刷新错误消失; 只有没有缓存数据时才显示错误状态和重试按钮.
+- 阅读器在一次 sanitize 中同时得到正文和阻止数量, 提示条与放行按钮由同一结果驱动, 不存在计数滞后于正文的状态.
+- 发件人放行状态在首次渲染时计算; 正文 iframe 以文档字符串作为 `key`, 文档变化时重建, 避免 `srcdoc` 属性更新被浏览器丢弃导致正文残留旧文档.
 - 远程图片默认阻止, 按发件人记住放行选择; `cid:` 内嵌图片从附件接口取回后转为 data URL 渲染; 链接强制 `target="_blank"` 和 `rel="noopener noreferrer"`.
 - 附件通过带会话的 API 下载, 文件名只用于展示, 响应头使用 `Content-Disposition: attachment`.
 - 任务中心 `/tasks` 占用左侧导航栏右侧的整个主内容区, 保留全局顶栏但隐藏写邮件和搜索入口; 标签栏紧贴顶栏下方; `Escape` 返回 `/`; 操作标签显示运行中和排队中任务, 错误标签显示失败任务及原因, 并保留重试和忽略操作.
@@ -666,14 +669,15 @@ HTTP 层注意:
 - 原始 MIME 不执行, 不渲染, 只解析.
 - 正文 HTML 清洗白名单: 保留排版标签, 去掉 `script`, `iframe`, `object`, `embed`, 事件属性和 `javascript:` URL.
 - iframe 使用 `sandbox="allow-popups allow-popups-to-escape-sandbox"`, 不带 `allow-scripts`, `allow-same-origin`, `allow-forms` 和 `allow-top-navigation`; 外部链接经过重写.
-- 默认阻止远程图片和外部样式, 图片地址改写为 `data-blocked-src`, 用户放行后再写入 `src`; CSP 的 `img-src` 允许这些放行后的远程图片, `frame-src` 包含 `about:` 以加载 sandbox `srcdoc`, 未放行时不会产生请求.
+- 默认阻止远程图片和外链样式, `<img>` 地址改写为 `data-blocked-src`, 用户放行后再写入 `src`; 远程 CSS 背景与 `background` 属性在未放行时移除并计入阻止数量, 放行后加载原地址; 其他远程 CSS URL 始终移除, 未放行时不会产生请求; CSP 的 `img-src` 允许放行后的远程图片, `frame-src` 包含 `about:` 以加载 sandbox `srcdoc`.
+- 后端 `mime.SanitizeHTML` 只做 allowlist 清洗并保留资源 URL, 不改写 `src`, `background` 或 CSS `url()`; 解析器通过 `mime.HasRemoteImage` 标记远程图片邮件.
 - 跟踪像素 (宽或高不超过 2px) 在阻止状态下直接移除, 不占位也不计入阻止数量.
 - 被阻止的小图标 (宽高都不超过 24px) 直接隐藏但仍计入阻止数量; 其他被阻止图片按原始尺寸显示虚线占位框.
 - HTTPS 页面把图片的 `http://` 地址升级为 `https://`, 避免混合内容拦截; HTTP 页面保持原地址.
-- 邮件自带的内联 `<style>` 块在移除 `@import`, 远程 `url()` 和可执行 CSS 后保留, 用于还原响应式布局和媒体查询.
+- 邮件自带的内联 `<style>` 块在移除 `@import` 和可执行 CSS 后保留; `background` 与 `background-image` 的远程 URL 按发件人放行状态保留或移除.
 - 表格的 `align`, `valign`, `width`, `height`, `cellpadding`, `cellspacing`, `border` 和 `bgcolor` 属性属于布局语义, 清洗时保留, 只校验取值范围.
-- 表格的 `background` 属性改写为 `data-background-src`, 只有用户放行远程图片后才恢复为 `background`.
-- `<html>` 和 `<body>` 上的背景声明提升为 iframe 根样式, 并移除其中的远程资源地址.
+- 表格的 `background` 属性由前端按发件人放行状态保留或移除, 未放行时计入阻止数量.
+- `<html>` 和 `<body>` 上的背景声明提升为 iframe 根样式; 远程 CSS 背景 URL 由前端按发件人授权状态决定是否加载.
 - `data:image/*` 内联图片直接渲染, 其他 `data:` URL 从图片和链接中移除.
 - 暗色模式把中性浅色背景压暗, 深色文字提亮, 高饱和和浅色强调背景保留; 文字颜色按最近的背景色判断, 图片不做反色.
 - 附件下载设置 `X-Content-Type-Options: nosniff`, 不内联渲染未知类型.

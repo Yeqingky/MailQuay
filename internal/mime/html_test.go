@@ -80,7 +80,7 @@ func TestSanitizeHTMLKeepsInlineDataImages(t *testing.T) {
 		`<img src="data:text/plain;base64,QQ==">`
 
 	out := mailmime.SanitizeHTML(raw)
-	if !strings.Contains(out, `data-src="data:image/png;base64,AAAA"`) {
+	if !strings.Contains(out, `src="data:image/png;base64,AAAA"`) {
 		t.Errorf("inline data image lost: %s", out)
 	}
 	if strings.Contains(out, "data:text/plain") {
@@ -114,15 +114,14 @@ func TestSanitizeHTMLLiftsRootBackground(t *testing.T) {
 	if !strings.Contains(out, "html, body {") || !strings.Contains(out, "#5c65ae") {
 		t.Errorf("root background lost: %s", out)
 	}
-	if strings.Contains(out, "tracker.example") {
-		t.Errorf("remote root background kept: %s", out)
+	if !strings.Contains(out, "tracker.example/bg.png") {
+		t.Errorf("root background URL lost: %s", out)
 	}
 }
 
 func TestSanitizeHTMLKeepsSafeStyleBlocks(t *testing.T) {
 	raw := `<style>@media only screen { .container { width: 95% !important } } .vmiss-logo { width: 150px }</style>` +
-		`<style>.x { background: url(https://tracker.example/a.png); color: #111111 }</style>` +
-		`<p class="container">text</p>`
+		`<style>.x { background: url(https://tracker.example/a.png); color: #111111 }</style>`
 
 	out := mailmime.SanitizeHTML(raw)
 	for _, want := range []string{"@media only screen", ".vmiss-logo", "width: 150px"} {
@@ -130,12 +129,12 @@ func TestSanitizeHTMLKeepsSafeStyleBlocks(t *testing.T) {
 			t.Errorf("style block lost %q: %s", want, out)
 		}
 	}
-	if strings.Contains(out, "tracker.example") {
-		t.Errorf("remote CSS URL kept: %s", out)
+	if !strings.Contains(out, "tracker.example/a.png") {
+		t.Errorf("style URL lost: %s", out)
 	}
 }
 
-func TestSanitizeHTMLRewritesRemoteResources(t *testing.T) {
+func TestSanitizeHTMLKeepsResources(t *testing.T) {
 	raw := `<p class="mail-para" style="color: red">Hi ` +
 		`<a href="https://example.com/path">link</a></p>` +
 		`<div class="banner" style="background-image: url('https://tracker.example/bg.png'); color: blue">bg</div>` +
@@ -162,22 +161,19 @@ func TestSanitizeHTMLRewritesRemoteResources(t *testing.T) {
 		t.Fatalf("image missing: %s", out)
 	}
 	imgAttrs := attrs(img)
-	if imgAttrs["data-src"] != "https://tracker.example/pixel.gif" {
-		t.Errorf("data-src = %q", imgAttrs["data-src"])
-	}
-	if _, ok := imgAttrs["src"]; ok {
-		t.Errorf("img still has src: %+v", imgAttrs)
+	if imgAttrs["src"] != "https://tracker.example/pixel.gif" {
+		t.Errorf("src = %q", imgAttrs["src"])
 	}
 	if imgAttrs["alt"] != "pixel" || imgAttrs["width"] != "1" || imgAttrs["height"] != "1" {
 		t.Errorf("img metadata lost: %+v", imgAttrs)
 	}
-
-	table := findElement(nodes, "table")
-	if table == nil || attrs(table)["data-background-src"] != "https://tracker.example/table.png" {
-		t.Errorf("table background not rewritten: %+v", table)
-	}
 	if _, ok := imgAttrs["onerror"]; ok {
 		t.Errorf("event handler survived: %+v", imgAttrs)
+	}
+
+	table := findElement(nodes, "table")
+	if table == nil || attrs(table)["background"] != "https://tracker.example/table.png" {
+		t.Errorf("table background lost: %+v", table)
 	}
 
 	div := findElement(nodes, "div")
@@ -185,11 +181,8 @@ func TestSanitizeHTMLRewritesRemoteResources(t *testing.T) {
 		t.Fatalf("div missing: %s", out)
 	}
 	divAttrs := attrs(div)
-	if divAttrs["data-src"] != "https://tracker.example/bg.png" {
-		t.Errorf("background data-src = %q", divAttrs["data-src"])
-	}
-	if strings.Contains(strings.ToLower(divAttrs["style"]), "url(") {
-		t.Errorf("style still contains url(): %q", divAttrs["style"])
+	if !strings.Contains(divAttrs["style"], "tracker.example/bg.png") {
+		t.Errorf("background image URL lost: %+v", divAttrs)
 	}
 	if !strings.Contains(divAttrs["style"], "color: blue") {
 		t.Errorf("safe style lost: %q", divAttrs["style"])
@@ -199,25 +192,70 @@ func TestSanitizeHTMLRewritesRemoteResources(t *testing.T) {
 	}
 }
 
-func TestSanitizeHTMLPrefersImageSource(t *testing.T) {
+func TestSanitizeHTMLKeepsImageSourceAndStyle(t *testing.T) {
 	out := mailmime.SanitizeHTML(`<img src="https://cdn.example/p.png" style="background-image: url('https://tracker.example/bg.png')">`)
 	img := findElement(parseFragment(t, out), "img")
 	if img == nil {
 		t.Fatalf("image missing: %s", out)
 	}
 	got := attrs(img)
-	if got["data-src"] != "https://cdn.example/p.png" {
-		t.Errorf("data-src = %q", got["data-src"])
+	if got["src"] != "https://cdn.example/p.png" {
+		t.Errorf("src = %q", got["src"])
 	}
-	if strings.Contains(strings.ToLower(got["style"]), "url(") {
-		t.Errorf("style still contains url(): %q", got["style"])
+	if !strings.Contains(got["style"], "tracker.example/bg.png") {
+		t.Errorf("background image URL lost: %+v", got)
+	}
+}
+
+func TestSanitizeHTMLDropsEmptyImageSource(t *testing.T) {
+	out := mailmime.SanitizeHTML(`<img src="" alt="logo">`)
+	img := findElement(parseFragment(t, out), "img")
+	if img == nil {
+		t.Fatalf("image missing: %s", out)
+	}
+	if _, ok := attrs(img)["src"]; ok {
+		t.Errorf("empty src survived: %+v", attrs(img))
+	}
+}
+
+func TestSanitizeHTMLRemovesImportsAndKeepsURLs(t *testing.T) {
+	out := mailmime.SanitizeHTML(`<style>@import url(https://evil.example/x.css); @font-face { font-family: remote; src: url(https://fonts.example/font.woff) } .x { background-image: url(https://images.example/bg.png) }</style>`)
+	if strings.Contains(out, "@import") {
+		t.Errorf("@import survived: %s", out)
+	}
+	for _, want := range []string{"fonts.example/font.woff", "images.example/bg.png"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("style URL %q lost: %s", want, out)
+		}
 	}
 }
 
 func TestSanitizeHTMLPreservesCIDImages(t *testing.T) {
 	out := mailmime.SanitizeHTML(`<img src="cid:part1.abc@example.com" alt="inline">`)
-	if !strings.Contains(out, `data-src="cid:part1.abc@example.com"`) {
+	if !strings.Contains(out, `src="cid:part1.abc@example.com"`) {
 		t.Errorf("cid image not preserved: %s", out)
+	}
+}
+
+func TestHasRemoteImage(t *testing.T) {
+	cases := []struct {
+		name string
+		html string
+		want bool
+	}{
+		{"image source", `<img src="https://cdn.example/a.png"/>`, true},
+		{"protocol relative", `<img src="//cdn.example/a.png"/>`, true},
+		{"table background", `<table background="https://cdn.example/a.png"></table>`, true},
+		{"inline background", `<div style="background-image: url(&#34;https://cdn.example/a.png&#34;)"></div>`, true},
+		{"style block", `<style>.x{background:url(https://cdn.example/a.png)}</style>`, true},
+		{"cid image", `<img src="cid:part1@example.com"/>`, false},
+		{"data image", `<img src="data:image/png;base64,AAAA"/>`, false},
+		{"plain text", `<p>hello src</p>`, false},
+	}
+	for _, tc := range cases {
+		if got := mailmime.HasRemoteImage(tc.html); got != tc.want {
+			t.Errorf("%s: HasRemoteImage = %v, want %v", tc.name, got, tc.want)
+		}
 	}
 }
 
