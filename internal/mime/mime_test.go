@@ -1,6 +1,7 @@
 package mime_test
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -271,5 +272,54 @@ func TestParseHTMLOnlyFallbackText(t *testing.T) {
 func TestParseEmptyMessage(t *testing.T) {
 	if _, err := mailmime.Parse(nil, mailmime.Options{}); err == nil {
 		t.Fatal("expected an error for an empty message")
+	}
+}
+
+func nestedMultipart(depth int, leaf string) string {
+	body := leaf
+	for i := depth; i >= 1; i-- {
+		boundary := "b" + strconv.Itoa(i)
+		body = "Content-Type: multipart/mixed; boundary=" + boundary + "\r\n\r\n" +
+			"--" + boundary + "\r\n" + body + "\r\n--" + boundary + "--\r\n"
+	}
+	return body
+}
+
+func TestParseLimitsMultipartDepth(t *testing.T) {
+	leaf := "Content-Type: text/html; charset=utf-8\r\n\r\n<p>deep</p>"
+
+	shallow, err := mailmime.Parse([]byte("From: a@example.com\r\n"+nestedMultipart(3, leaf)), mailmime.Options{})
+	if err != nil {
+		t.Fatalf("Parse shallow: %v", err)
+	}
+	if shallow.HTML == "" {
+		t.Fatal("shallow nested HTML body missing")
+	}
+
+	deep, err := mailmime.Parse([]byte("From: a@example.com\r\n"+nestedMultipart(40, leaf)), mailmime.Options{})
+	if err != nil {
+		t.Fatalf("Parse deep: %v", err)
+	}
+	if deep.HTML != "" {
+		t.Fatal("body beyond the nesting limit should be ignored")
+	}
+}
+
+func TestParseLimitsPartCount(t *testing.T) {
+	var builder strings.Builder
+	builder.WriteString("Content-Type: multipart/mixed; boundary=many\r\n\r\n")
+	const total = 1500
+	for range total {
+		builder.WriteString("--many\r\nContent-Type: image/png\r\n\r\nx\r\n")
+	}
+	builder.WriteString("--many--\r\n")
+
+	parsed, err := mailmime.Parse([]byte(builder.String()), mailmime.Options{})
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	// The root entity plus 999 children are visited; the rest is skipped.
+	if len(parsed.Attachments) != 999 {
+		t.Fatalf("attachments = %d, want 999", len(parsed.Attachments))
 	}
 }

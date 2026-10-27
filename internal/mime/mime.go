@@ -82,7 +82,7 @@ func Parse(raw []byte, opts Options) (*Parsed, error) {
 	readHeaders(entity.Header, parsed)
 
 	c := collector{opts: opts, parsed: parsed}
-	c.walk(entity, "")
+	c.walk(entity, "", 0)
 
 	if parsed.Text == "" && parsed.HTML != "" {
 		parsed.Text = textFromHTML(parsed.HTML)
@@ -221,17 +221,27 @@ func decodeHeaderWord(value string) string {
 	return value
 }
 
+const (
+	// maxPartDepth bounds multipart nesting. Deeper parts are ignored, so a
+	// crafted message cannot recurse until the stack is exhausted.
+	maxPartDepth = 20
+	// maxPartCount bounds how many parts one message may contribute.
+	maxPartCount = 1000
+)
+
 type collector struct {
 	opts    Options
 	parsed  *Parsed
 	textSet bool
 	htmlSet bool
+	parts   int
 }
 
-func (c *collector) walk(entity *message.Entity, path string) {
-	if entity == nil {
+func (c *collector) walk(entity *message.Entity, path string, depth int) {
+	if entity == nil || depth > maxPartDepth || c.parts >= maxPartCount {
 		return
 	}
+	c.parts++
 	reader := entity.MultipartReader()
 	if reader == nil {
 		c.leaf(entity, path)
@@ -240,6 +250,9 @@ func (c *collector) walk(entity *message.Entity, path string) {
 	defer reader.Close()
 
 	for number := 1; ; number++ {
+		if c.parts >= maxPartCount {
+			return
+		}
 		part, err := reader.NextPart()
 		if part == nil {
 			return
@@ -248,7 +261,7 @@ func (c *collector) walk(entity *message.Entity, path string) {
 		if path != "" {
 			childPath = path + "." + childPath
 		}
-		c.walk(part, childPath)
+		c.walk(part, childPath, depth+1)
 		if err != nil && !message.IsUnknownCharset(err) && !message.IsUnknownEncoding(err) {
 			return
 		}

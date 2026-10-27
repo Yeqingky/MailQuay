@@ -670,7 +670,7 @@ HTTP 层注意:
 
 ### 8.5 邮件内容
 
-- 原始 MIME 不执行, 不渲染, 只解析.
+- 原始 MIME 不执行, 不渲染, 只解析; 多部分嵌套最多 20 层, 单封最多展开 1000 个分片, 超出部分忽略.
 - 正文 HTML 清洗白名单: 保留排版标签, 去掉 `script`, `iframe`, `object`, `embed`, 事件属性和 `javascript:` URL.
 - iframe 使用 `sandbox="allow-popups allow-popups-to-escape-sandbox"`, 不带 `allow-scripts`, `allow-same-origin`, `allow-forms` 和 `allow-top-navigation`; 外部链接经过重写.
 - 默认阻止远程图片和外链样式, `<img>` 地址改写为 `data-blocked-src`, 用户放行后再写入 `src`; 远程 CSS 背景与 `background` 属性在未放行时移除并计入阻止数量, 放行后加载原地址; 其他远程 CSS URL 始终移除, 未放行时不会产生请求; CSP 的 `img-src` 允许放行后的远程图片, `frame-src` 包含 `about:` 以加载 sandbox `srcdoc`.
