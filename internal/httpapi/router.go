@@ -159,7 +159,7 @@ func (s *Server) sessionMiddleware(next http.Handler) http.Handler {
 		if cookie, err := r.Cookie(auth.SessionCookie); err == nil && cookie.Value != "" {
 			if loaded, err := s.auth.Authenticate(r.Context(), cookie.Value); err == nil {
 				sess = loaded
-				s.refreshSessionCookie(w, r, loaded)
+				r = r.WithContext(WithCSRFToken(r.Context(), s.refreshAuthCookies(w, r, loaded)))
 			}
 		}
 		if path == "/auth/me" {
@@ -185,18 +185,51 @@ func (s *Server) sessionMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) refreshSessionCookie(w http.ResponseWriter, r *http.Request, sess *auth.Session) {
+// refreshAuthCookies slides the session and CSRF cookies to the same expiry and
+// returns the CSRF token now in force. The CSRF cookie keeps its existing value
+// so tabs holding the token keep working; it is reissued only when the browser
+// no longer sends it.
+func (s *Server) refreshAuthCookies(w http.ResponseWriter, r *http.Request, sess *auth.Session) string {
+	secure, sameSite := s.cookiePolicy(r)
+	maxAge := cookieMaxAge(sess.ExpiresAt)
+	csrf := ""
+	if cookie, err := r.Cookie(auth.CSRFCookie); err == nil {
+		csrf = cookie.Value
+	}
+	if csrf == "" {
+		if token, err := auth.NewCSRFToken(); err == nil {
+			csrf = token
+		}
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name: auth.SessionCookie, Value: sess.Token, Path: "/", HttpOnly: true,
+		Secure: secure, SameSite: sameSite, MaxAge: maxAge, Expires: sess.ExpiresAt.UTC(),
+	})
+	if csrf != "" {
+		http.SetCookie(w, &http.Cookie{
+			Name: auth.CSRFCookie, Value: csrf, Path: "/", HttpOnly: false,
+			Secure: secure, SameSite: sameSite, MaxAge: maxAge, Expires: sess.ExpiresAt.UTC(),
+		})
+	}
+	return csrf
+}
+
+func (s *Server) cookiePolicy(r *http.Request) (bool, http.SameSite) {
 	secure := auth.RequestScheme(r, s.cfg.TrustedProxies) == "https"
 	sameSite := http.SameSiteLaxMode
 	if len(s.cfg.CORSOrigins) > 0 {
 		secure = true
 		sameSite = http.SameSiteNoneMode
 	}
-	http.SetCookie(w, &http.Cookie{
-		Name: auth.SessionCookie, Value: sess.Token, Path: "/", HttpOnly: true,
-		Secure: secure, SameSite: sameSite,
-		Expires: sess.ExpiresAt.UTC(),
-	})
+	return secure, sameSite
+}
+
+func cookieMaxAge(expires time.Time) int {
+	maxAge := int(time.Until(expires).Seconds())
+	if maxAge < 0 {
+		return 0
+	}
+	return maxAge
 }
 
 func (s *Server) csrfMiddleware(next http.Handler) http.Handler {

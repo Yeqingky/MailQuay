@@ -637,7 +637,7 @@ HTTP 层注意:
 - 首次启动生成一次性 setup token 并写入服务端日志; 也可以用 `MAILQUAY_SETUP_TOKEN` 预先指定. `/setup` 必须提交该 token, 初始化完成后立即失效; 未初始化时除 `/auth/setup` 和健康检查外的 API 返回 `409`.
 - 登录成功后生成 32 字节随机会话令牌, 数据库只保存 SHA-256 摘要.
 - Cookie 设置 `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`. `Secure` 在生产 HTTPS 下强制; 本地开发只允许 loopback 上的 HTTP 例外.
-- 会话默认 7 天, 活动时滑动续期; 修改密码撤销全部会话.
+- 会话默认 7 天, 活动时滑动续期; 会话 Cookie 与 CSRF Cookie 同步续期; 修改密码撤销全部会话.
 - 登录和 OAuth 回调按 IP 和账号限流.
 
 ### 8.2 传输安全提醒
@@ -654,7 +654,8 @@ HTTP 层注意:
 ### 8.3 CSRF 与请求校验
 
 - 所有非安全方法校验 `Origin` 或 `Sec-Fetch-Site`, 只接受同源和显式允许的来源.
-- 同时使用双提交令牌: 登录时下发可读的 CSRF Cookie, 前端在 `X-CSRF-Token` 头回传.
+- 同时使用双提交令牌: 登录时下发可读的 CSRF Cookie, 每次通过认证的请求随会话一起续期, 前端在 `X-CSRF-Token` 头回传.
+- CSRF Cookie 丢失时, 认证请求重新下发令牌; `/auth/me` 返回当前令牌, 无需重新登录.
 - JSON 请求要求 `Content-Type: application/json`, 表单端点单独处理.
 - CORS 默认关闭; 只有配置了允许来源才允许跨源, 且必须配合 `SameSite=None; Secure`.
 

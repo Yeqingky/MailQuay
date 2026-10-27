@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -181,6 +182,42 @@ func TestHTTPAuthAndAccountFlow(t *testing.T) {
 		t.Fatalf("cross-origin cookie policy not applied: %s", setCookie)
 	}
 	csrf = csrfFromJar(t, jar, server.URL)
+	// A sliding session must carry its CSRF cookie: after the cookie is gone the
+	// session still works, so /auth/me has to hand back a usable token.
+	resp, err = client.Get(base + "/auth/me")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if csrfFromJar(t, jar, server.URL) != csrf {
+		t.Fatal("session refresh must keep the CSRF token stable for open tabs")
+	}
+	expireCookie(t, jar, server.URL, auth.CSRFCookie)
+	resp, err = client.Get(base + "/auth/me")
+	if err != nil {
+		t.Fatal(err)
+	}
+	setCookie = strings.Join(resp.Header.Values("Set-Cookie"), "\n")
+	if err := json.NewDecoder(resp.Body).Decode(&me); err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if !strings.Contains(setCookie, auth.CSRFCookie+"=") {
+		t.Fatalf("session refresh must reissue the CSRF cookie: %s", setCookie)
+	}
+	csrf, _ = me["csrfToken"].(string)
+	if csrf == "" {
+		t.Fatal("auth status must return the reissued CSRF token")
+	}
+	if csrfFromJar(t, jar, server.URL) != csrf {
+		t.Fatal("CSRF cookie and auth status token must match")
+	}
+	resp = sendJSON(t, client, http.MethodPatch, base+"/settings", map[string]any{"logLevel": "debug"}, csrf)
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("write after CSRF cookie loss %d: %s", resp.StatusCode, body)
+	}
+	resp.Body.Close()
 	if _, leaked := settings["googleClientSecret"]; leaked {
 		t.Fatal("OAuth secret leaked in settings response")
 	}
@@ -328,4 +365,18 @@ func csrfFromJar(t *testing.T, jar http.CookieJar, serverURL string) string {
 	}
 	t.Fatal("csrf cookie missing")
 	return ""
+}
+
+func expireCookie(t *testing.T, jar http.CookieJar, serverURL, name string) {
+	t.Helper()
+	parsed, err := url.Parse(serverURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jar.SetCookies(parsed, []*http.Cookie{{Name: name, Value: "", Path: "/", MaxAge: -1, Expires: time.Unix(1, 0)}})
+	for _, cookie := range jar.Cookies(parsed) {
+		if cookie.Name == name {
+			t.Fatalf("cookie %s still present", name)
+		}
+	}
 }

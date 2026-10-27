@@ -70,6 +70,8 @@ type ctxKey int
 
 const userKey ctxKey = 1
 
+const csrfKey ctxKey = 2
+
 // WithUser stores the authenticated session in a request context.
 func WithUser(ctx context.Context, sess *auth.Session) context.Context {
 	return context.WithValue(ctx, userKey, sess)
@@ -79,6 +81,17 @@ func WithUser(ctx context.Context, sess *auth.Session) context.Context {
 func UserFrom(ctx context.Context) (*auth.Session, bool) {
 	sess, ok := ctx.Value(userKey).(*auth.Session)
 	return sess, ok
+}
+
+// WithCSRFToken stores the CSRF token issued for the current session.
+func WithCSRFToken(ctx context.Context, token string) context.Context {
+	return context.WithValue(ctx, csrfKey, token)
+}
+
+// CSRFTokenFrom returns the CSRF token issued for the current session.
+func CSRFTokenFrom(ctx context.Context) (string, bool) {
+	token, ok := ctx.Value(csrfKey).(string)
+	return token, ok && token != ""
 }
 
 func (s *Server) user(ctx context.Context) (sqlcgen.User, bool) {

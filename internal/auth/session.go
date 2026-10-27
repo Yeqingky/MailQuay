@@ -231,6 +231,11 @@ func randomToken() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
 
+// NewCSRFToken returns a random token for the double-submit CSRF cookie.
+func NewCSRFToken() (string, error) {
+	return randomToken()
+}
+
 func truncate(s string, n int) string {
 	if len(s) <= n {
 		return s

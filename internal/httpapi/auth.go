@@ -32,8 +32,8 @@ func (s *Server) GetAuthStatus(w http.ResponseWriter, r *http.Request) {
 		}
 		user := mapUser(sess.User)
 		status.User = &user
-		if cookie, err := r.Cookie(auth.CSRFCookie); err == nil && cookie.Value != "" {
-			status.CsrfToken = &cookie.Value
+		if token, ok := CSRFTokenFrom(r.Context()); ok {
+			status.CsrfToken = &token
 		}
 	}
 	writeJSON(w, http.StatusOK, status)
@@ -139,16 +139,8 @@ func (s *Server) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) setAuthCookies(w http.ResponseWriter, r *http.Request, sess *auth.Session) {
-	secure := auth.RequestScheme(r, s.cfg.TrustedProxies) == "https"
-	sameSite := http.SameSiteLaxMode
-	if len(s.cfg.CORSOrigins) > 0 {
-		secure = true
-		sameSite = http.SameSiteNoneMode
-	}
-	maxAge := int(time.Until(sess.ExpiresAt).Seconds())
-	if maxAge < 0 {
-		maxAge = 0
-	}
+	secure, sameSite := s.cookiePolicy(r)
+	maxAge := cookieMaxAge(sess.ExpiresAt)
 	http.SetCookie(w, &http.Cookie{
 		Name: auth.SessionCookie, Value: sess.Token, Path: "/", HttpOnly: true,
 		Secure: secure, SameSite: sameSite, MaxAge: maxAge, Expires: sess.ExpiresAt,
@@ -160,12 +152,7 @@ func (s *Server) setAuthCookies(w http.ResponseWriter, r *http.Request, sess *au
 }
 
 func (s *Server) clearAuthCookies(w http.ResponseWriter, r *http.Request) {
-	secure := auth.RequestScheme(r, s.cfg.TrustedProxies) == "https"
-	sameSite := http.SameSiteLaxMode
-	if len(s.cfg.CORSOrigins) > 0 {
-		secure = true
-		sameSite = http.SameSiteNoneMode
-	}
+	secure, sameSite := s.cookiePolicy(r)
 	for _, name := range []string{auth.SessionCookie, auth.CSRFCookie} {
 		http.SetCookie(w, &http.Cookie{
 			Name: name, Value: "", Path: "/", HttpOnly: name == auth.SessionCookie,
