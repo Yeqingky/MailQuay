@@ -7,7 +7,6 @@ export interface ToastItem {
   title: string;
   description?: string;
   variant: ToastVariant;
-  dismissing?: boolean;
 }
 
 interface ToastState {
@@ -32,9 +31,6 @@ const timers = new Map<string, number>();
 const remaining = new Map<string, number>();
 const deadlines = new Map<string, number>();
 
-const EXIT_DURATION_MS = 180;
-const exitTimers = new Map<string, number>();
-
 function clearTimer(id: string) {
   const timer = timers.get(id);
   if (timer !== undefined) {
@@ -42,14 +38,6 @@ function clearTimer(id: string) {
     timers.delete(id);
   }
   deadlines.delete(id);
-}
-
-function clearExitTimer(id: string) {
-  const timer = exitTimers.get(id);
-  if (timer !== undefined) {
-    window.clearTimeout(timer);
-    exitTimers.delete(id);
-  }
 }
 
 function schedule(id: string, ms: number) {
@@ -77,7 +65,6 @@ export const useToastStore = create<ToastState>((set, get) => ({
     const dropped = current.slice(0, Math.max(0, current.length - (MAX_TOASTS - 1)));
     for (const item of dropped) {
       clearTimer(item.id);
-      clearExitTimer(item.id);
       remaining.delete(item.id);
     }
     set({
@@ -91,22 +78,11 @@ export const useToastStore = create<ToastState>((set, get) => ({
     return id;
   },
   dismiss: (id) => {
-    const item = get().toasts.find((entry) => entry.id === id);
-    if (!item || item.dismissing) return;
+    const exists = get().toasts.some((entry) => entry.id === id);
+    if (!exists) return;
     clearTimer(id);
     remaining.delete(id);
-    set({
-      toasts: get().toasts.map((entry) =>
-        entry.id === id ? { ...entry, dismissing: true } : entry,
-      ),
-    });
-    exitTimers.set(
-      id,
-      window.setTimeout(() => {
-        exitTimers.delete(id);
-        set({ toasts: get().toasts.filter((entry) => entry.id !== id) });
-      }, EXIT_DURATION_MS),
-    );
+    set({ toasts: get().toasts.filter((entry) => entry.id !== id) });
   },
   pause: () => {
     pauseCount += 1;

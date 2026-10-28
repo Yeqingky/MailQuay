@@ -17,7 +17,6 @@ import {
 import { isSettingsPath, mailViewFromPathname } from '@/lib/routes';
 import { ComposeOverlay } from '@/features/compose/ComposeOverlay';
 import { MailPage } from '@/pages/MailPage';
-import { useComposeStore } from '@/stores/compose';
 import { useUiStore } from '@/stores/ui';
 import { cn } from '@/lib/utils';
 
@@ -29,8 +28,6 @@ export function AppLayout() {
   const currentView = mailViewFromPathname(pathname);
   const auth = useAuthStatus();
   useEventStream(true);
-  const composeOpen = useComposeStore((state) => state.isOpen);
-  const seed = useComposeStore((state) => state.seed);
   const sidebarWidth = useUiStore((state) => state.sidebarWidth);
   const setSidebarWidth = useUiStore((state) => state.setSidebarWidth);
   const sidebarStyle = { '--sidebar-width': `${sidebarWidth}px` } as CSSProperties;
@@ -76,7 +73,7 @@ export function AppLayout() {
         </div>
       </div>
       {settingsOpen ? <Outlet /> : null}
-      {composeOpen ? <ComposeOverlay seed={seed} /> : null}
+      <ComposeOverlay />
     </div>
   );
 }

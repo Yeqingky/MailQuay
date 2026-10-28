@@ -82,6 +82,7 @@ flowchart LR
 | 路由 | `react-router` | 单个 `index.html` 上的客户端路由, 深链接回落到应用壳. |
 | 服务端状态 | TanStack Query v5 | 缓存, 乐观更新, 由 SSE 驱动失效. |
 | UI | Tailwind CSS v4 + shadcn/ui | 基于 Radix 的可访问组件, 样式完全可控. |
+| 动画 | Motion | spring 和进出场动画, 遵循系统的减少动态效果设置. |
 | 实时推送 | Server-Sent Events | 单向推送, 最多重连 3 次, 直接复用 Cookie 认证. |
 
 ## 仓库

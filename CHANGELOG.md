@@ -4,6 +4,8 @@
 
 ### 变更
 
+- 顶栏搜索改为点击后在顶栏内展开整行搜索输入, 替换写邮件和右侧操作, 不再弹出浮层; 提交导航到 `/search`, `Escape` 关闭.
+- 前端引入 Motion: 通知堆叠改为 layout 和 presence 动画, 设置与写邮件浮层使用 spring 入场和退出动画, 阅读器切换淡入, 任务进度条改为 spring 过渡; 统一遵循 `prefers-reduced-motion`.
 - 运行日志改为 SSE 推送: 新增 `GET /logs/stream`, 按 `<generation>-<entryId>` 游标增量发送日志批次, 重连用 `Last-Event-ID` 或 `after` 补发, 缓冲区清空或游标被覆盖时先发 `reset` 事件再重放保留窗口.
 - `GET /logs` 返回值增加 `cursor`, 作为日志流的起始游标.
 - 任务中心日志标签不再每 1.5 秒轮询, 改为打开时取一次快照并保持日志流; 连续失败 3 次后显示重连提示.

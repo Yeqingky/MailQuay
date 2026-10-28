@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
@@ -188,7 +189,12 @@ export function MessageReader({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
+    <motion.div
+      initial={{ opacity: 0.4, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+      className="flex h-full min-h-0 flex-col bg-background"
+    >
       <div className="flex h-12 shrink-0 items-center gap-1 border-b px-2 md:h-14 md:px-3">
         <Button
           variant="ghost"
@@ -448,7 +454,7 @@ export function MessageReader({
         pending={remove.isPending}
         onConfirm={() => remove.mutate()}
       />
-    </div>
+    </motion.div>
   );
 }
 

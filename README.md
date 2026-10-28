@@ -82,6 +82,7 @@ The browser only talks to the backend HTTP API. The backend owns IMAP, POP3, and
 | Routing | react-router | Client-side routing over one `index.html`; deep links fall back to the app shell. |
 | Server state | TanStack Query v5 | Cache, optimistic updates, and SSE-driven invalidation. |
 | UI | Tailwind CSS v4 + shadcn/ui | Accessible Radix primitives with full local control of styles. |
+| Animation | Motion | Spring and presence animations that follow the reduced-motion preference. |
 | Realtime | Server-sent events | One-way server push with up to three reconnect attempts and simple cookie auth. |
 
 ## Repositories

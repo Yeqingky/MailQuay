@@ -238,6 +238,7 @@ frontend/
 | `components/layout` | `Sidebar`, `TopBar`, `UserMenu`, `SettingsSidebar`, 布局原子 |
 | `lib/api` | 生成的类型与客户端, 错误归一化 |
 | `lib/events` | SSE 连接, 重连上限, 连接状态, 事件到 Query 缓存的映射 |
+| `lib/motion` | 共享 spring 和淡入过渡预设 |
 | `stores` | 只放 UI 状态, 不放服务端数据 |
 
 ## 4. 前端布局

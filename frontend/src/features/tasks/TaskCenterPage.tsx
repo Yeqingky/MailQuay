@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { motion, useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
@@ -145,6 +146,7 @@ function TaskRow({
   accountEmail?: string;
 }) {
   const { t } = useTranslation();
+  const reduceMotion = useReducedMotion();
   const Icon = TYPE_ICONS[segment.type] ?? Activity;
   const tone = STATUS_TONE[segment.status] ?? '--task-muted';
   const failed = segment.failed;
@@ -194,9 +196,16 @@ function TaskRow({
             aria-valuenow={segment.percent}
             aria-label={taskTypeLabel(t, segment.type)}
           >
-            <div
-              className="h-full rounded-full transition-[width] duration-300 ease-out motion-reduce:transition-none"
-              style={{ width: `${segment.percent}%`, backgroundColor: `var(${tone})` }}
+            <motion.div
+              initial={false}
+              animate={{ width: `${segment.percent}%` }}
+              transition={
+                reduceMotion
+                  ? { duration: 0 }
+                  : { type: 'spring', stiffness: 120, damping: 22, mass: 0.8 }
+              }
+              className="h-full rounded-full"
+              style={{ backgroundColor: `var(${tone})` }}
             />
           </div>
         </div>
