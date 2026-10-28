@@ -26,7 +26,6 @@ export const router = createBrowserRouter([
           { path: 'marked', element: <MailPage /> },
           { path: 'archive', element: <MailPage /> },
           { path: 'tasks', element: <MailPage /> },
-          { path: 'search', element: <MailPage /> },
           { path: 'accounts/:accountId/mailboxes/:mailboxId', element: <MailPage /> },
           { path: 'settings', element: <SettingsPage /> },
           { path: 'settings/:group', element: <SettingsPage /> },

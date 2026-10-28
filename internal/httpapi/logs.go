@@ -13,7 +13,7 @@ import (
 
 // logHeartbeat keeps proxies from closing an idle log stream. It matches the
 // main event stream so one reverse proxy timeout covers both.
-const logHeartbeat = 15 * time.Second
+const logHeartbeat = 5 * time.Second
 
 func (s *Server) ListLogs(w http.ResponseWriter, _ *http.Request) {
 	entries := s.logs.List()

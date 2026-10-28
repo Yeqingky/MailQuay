@@ -31,7 +31,7 @@ MailQuay is not a mail server. It does not run an MTA, does not own a domain, an
 - Local marked mail keeps full bodies and attachments and survives account removal by default.
 - Local archive stores an independent full copy that survives remote deletion and account removal.
 - Delete moves mail to Trash and leaves cleanup to the provider.
-- Structured search combines subject/all mode with account, folder, recipient, sender, and attachment filters.
+- Structured search combines subject/all mode with account, recipient, sender, and attachment filters; the folder scope follows the current view.
 - Unified views deduplicate the same message across folders with a stable provider ID, Message-ID, or content hash fallback.
 - Non-HTTPS access outside loopback and private ranges shows a permanent red warning above the app.
 - Two backend builds: `mailquay` with embedded frontend assets, and `mailquay-core` as API-only.

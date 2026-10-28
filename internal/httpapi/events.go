@@ -61,7 +61,7 @@ func (s *Server) StreamEvents(w http.ResponseWriter, r *http.Request, params oap
 	}
 	ch, cancel := s.hub.Subscribe(r.Context())
 	defer cancel()
-	heartbeat := time.NewTicker(15 * time.Second)
+	heartbeat := time.NewTicker(5 * time.Second)
 	defer heartbeat.Stop()
 	for {
 		select {

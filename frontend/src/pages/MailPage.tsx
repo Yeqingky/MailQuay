@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router';
 import { EmptyState } from '@/components/common/States';
@@ -8,7 +9,11 @@ import { useMessageList } from '@/features/message-list/useMessages';
 import type { ListMessagesParams, MessageSummary } from '@/features/message-list/api';
 import { fetchMailboxTree, requestMailboxSync } from '@/features/mailboxes/api';
 import { SearchFiltersPanel } from '@/features/search/SearchFiltersPanel';
-import { useSearchMessages } from '@/features/search/useSearch';
+import {
+  hasScopedCriteria,
+  useSearchMessages,
+  type SearchScope,
+} from '@/features/search/useSearch';
 import { useSearchStore } from '@/stores/search';
 import { ArchivePage } from '@/features/archive/ArchivePage';
 import { DraftsPage } from '@/features/compose/DraftsPage';
@@ -17,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toast';
 import { useErrorMessage } from '@/hooks/useErrorMessage';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { EASE_OUT } from '@/lib/motion';
 import { mailViewFromPathname } from '@/lib/routes';
 
 function useFolderRoute() {
@@ -34,28 +40,67 @@ export function MailPage() {
   const { pathname } = useLocation();
   const view = mailViewFromPathname(pathname);
   const folderRoute = useFolderRoute();
+  const panelOpen = useSearchStore((state) => state.panelOpen);
+  const applied = useSearchStore((state) => state.applied);
+  const reduceMotion = useReducedMotion();
   useDocumentTitle('');
 
-  if (view === 'drafts') return <DraftsPage />;
-  if (view === 'tasks') return <TaskCenterPage />;
-  if (view === 'archive') return <ArchivePage />;
-  if (view === 'search') return <SearchPage />;
-  if (view === 'folder') {
-    return <FolderPage folderRoute={folderRoute} />;
+  const scope = useMemo<SearchScope>(
+    () =>
+      view === 'folder'
+        ? { accountId: folderRoute.accountId, mailboxId: folderRoute.mailboxId }
+        : {},
+    [view, folderRoute.accountId, folderRoute.mailboxId],
+  );
+  const showPanel = panelOpen && view !== 'tasks';
+  const searchActive = showPanel && hasScopedCriteria(applied, scope);
+
+  let content: ReactNode;
+  if (view === 'drafts') {
+    content = <DraftsPage />;
+  } else if (view === 'tasks') {
+    content = <TaskCenterPage />;
+  } else if (view === 'archive') {
+    content = <ArchivePage />;
+  } else if (view === 'folder') {
+    content = <FolderPage folderRoute={folderRoute} />;
+  } else if (view === 'sent' || view === 'trash') {
+    content = <MultiMailboxPage view={view} />;
+  } else if (view === 'all' || view === 'unread' || view === 'marked') {
+    content = <GlobalViewPage view={view} />;
+  } else {
+    content = (
+      <EmptyState
+        title={t('errors.notFound')}
+        action={
+          <Button asChild variant="outline" size="sm">
+            <Link to="/">{t('nav.all')}</Link>
+          </Button>
+        }
+      />
+    );
   }
-  if (view === 'sent' || view === 'trash') return <MultiMailboxPage view={view} />;
-  if (view === 'all' || view === 'unread' || view === 'marked') {
-    return <GlobalViewPage view={view} />;
-  }
+
   return (
-    <EmptyState
-      title={t('errors.notFound')}
-      action={
-        <Button asChild variant="outline" size="sm">
-          <Link to="/">{t('nav.all')}</Link>
-        </Button>
-      }
-    />
+    <div className="flex min-h-0 flex-1 flex-col">
+      <AnimatePresence initial={false}>
+        {showPanel ? (
+          <motion.div
+            key="search-panel"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: EASE_OUT }}
+            className="shrink-0 overflow-hidden"
+          >
+            <SearchFiltersPanel showAccountFilter={!scope.accountId} />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+      <div className="flex min-h-0 flex-1 flex-col">
+        {searchActive ? <SearchResults scope={scope} /> : content}
+      </div>
+    </div>
   );
 }
 
@@ -254,35 +299,32 @@ function MultiMailboxPage({ view }: { view: 'sent' | 'trash' }) {
   );
 }
 
-function SearchPage() {
+function SearchResults({ scope }: { scope: SearchScope }) {
   const { t } = useTranslation();
   const applied = useSearchStore((state) => state.applied);
-  const query = useSearchMessages(applied);
+  const query = useSearchMessages(applied, scope);
   const title = applied.q
     ? t('search.resultsFor', { query: applied.q })
     : t('search.results');
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <SearchFiltersPanel />
-      <MessagesWorkspace
-        title={title}
-        messages={query.messages}
-        query={{
-          isPending: query.enabled && query.isPending,
-          isError: query.isError,
-          error: query.error,
-          refetch: () => void query.refetch(),
-          hasNextPage: query.hasNextPage,
-          isFetchingNextPage: query.isFetchingNextPage,
-          fetchNextPage: () => void query.fetchNextPage(),
-        }}
-        showAccountBadge
-        emptyTitle={query.enabled ? t('search.noResultsTitle') : t('search.title')}
-        emptyBody={query.enabled ? t('search.noResultsBody') : t('search.emptyQuery')}
-        errorTitle={t('search.unavailable')}
-        resetKey={JSON.stringify(applied)}
-      />
-    </div>
+    <MessagesWorkspace
+      title={title}
+      messages={query.messages}
+      query={{
+        isPending: query.enabled && query.isPending,
+        isError: query.isError,
+        error: query.error,
+        refetch: () => void query.refetch(),
+        hasNextPage: query.hasNextPage,
+        isFetchingNextPage: query.isFetchingNextPage,
+        fetchNextPage: () => void query.fetchNextPage(),
+      }}
+      showAccountBadge
+      emptyTitle={query.enabled ? t('search.noResultsTitle') : t('search.title')}
+      emptyBody={query.enabled ? t('search.noResultsBody') : t('search.emptyQuery')}
+      errorTitle={t('search.unavailable')}
+      resetKey={JSON.stringify(applied)}
+    />
   );
 }

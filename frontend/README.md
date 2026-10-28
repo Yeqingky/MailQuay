@@ -35,7 +35,7 @@ The app boots from a single `index.html` and navigates with `react-router`; swit
 The shell uses a fixed left rail with a content-area top bar:
 
 - Outside loopback and private ranges, a non-dismissible red banner appears above the whole shell when the request is not HTTPS. Additional domains and CIDRs can be allowed through deployment configuration.
-- The content area has its own top bar. Left: compose. Right: search, refresh, task ring, theme toggle, signed-in user avatar. Clicking search expands a full-width inline field across the bar, replacing compose and the right-side actions until it is submitted or dismissed. The task center keeps the top bar but hides compose and search.
+- The content area has its own top bar. Left: compose. Right: search, refresh, task ring, theme toggle, signed-in user avatar. Clicking search expands a filter panel at the top of the content area and clicking it again collapses the panel. The search scope follows the current page: global views search all mail and can narrow by account, while an account folder searches only that folder. The task center keeps the top bar but hides compose and search.
 - The avatar is the signed-in user, not a mailbox account. Hovering or clicking opens a compact card with profile, settings, and sign out.
 - Desktop rail is resizable (default `232px`, minimum `180px`): the global views are always listed, followed by the collapsed mailbox account list; the bottom shows only the SSE connection status.
 - Global views are All mail, Unread, Sent, Sending, Drafts, Trash, Marked, and Local archive. Marked is hidden when empty. The global section has no Other.

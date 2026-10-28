@@ -4,15 +4,26 @@ import type { SearchFilters, AttachmentFilter } from '@/stores/search';
 import { searchKeys, searchMessages, type SearchParams } from './api';
 import type { MessagePage } from '@/features/message-list/api';
 
+/** Account and folder the current page represents, empty for global views. */
+export interface SearchScope {
+  accountId?: string;
+  mailboxId?: string;
+}
+
 export function hasSearchCriteria(filters: SearchFilters): boolean {
   return (
     filters.q.trim() !== '' ||
     filters.accountId !== '' ||
-    filters.mailboxId !== '' ||
     filters.recipient.trim() !== '' ||
     filters.sender.trim() !== '' ||
     filters.hasAttachment !== 'any'
   );
+}
+
+/** A folder-scoped search does not treat the hidden account filter as criteria. */
+export function hasScopedCriteria(filters: SearchFilters, scope: SearchScope): boolean {
+  if (!scope.accountId) return hasSearchCriteria(filters);
+  return hasSearchCriteria({ ...filters, accountId: '' });
 }
 
 function attachmentValue(filter: AttachmentFilter): boolean | undefined {
@@ -21,12 +32,12 @@ function attachmentValue(filter: AttachmentFilter): boolean | undefined {
   return undefined;
 }
 
-export function toSearchParams(filters: SearchFilters): SearchParams {
+export function toSearchParams(filters: SearchFilters, scope: SearchScope = {}): SearchParams {
   return {
     q: filters.q.trim() || undefined,
     mode: filters.mode,
-    accountId: filters.accountId || undefined,
-    mailboxId: filters.mailboxId || undefined,
+    accountId: scope.accountId || filters.accountId || undefined,
+    mailboxId: scope.mailboxId,
     recipient: filters.recipient.trim() || undefined,
     sender: filters.sender.trim() || undefined,
     hasAttachment: attachmentValue(filters.hasAttachment),
@@ -34,9 +45,9 @@ export function toSearchParams(filters: SearchFilters): SearchParams {
   };
 }
 
-export function useSearchMessages(filters: SearchFilters) {
-  const params = toSearchParams(filters);
-  const enabled = hasSearchCriteria(filters);
+export function useSearchMessages(filters: SearchFilters, scope: SearchScope = {}) {
+  const params = toSearchParams(filters, scope);
+  const enabled = hasScopedCriteria(filters, scope);
   const query = useInfiniteQuery<
     MessagePage,
     Error,

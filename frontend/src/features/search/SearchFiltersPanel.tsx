@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,23 +14,20 @@ const ANY_ATTACHMENT = 'any';
 const WITH_ATTACHMENT = 'with';
 const WITHOUT_ATTACHMENT = 'without';
 
-export function SearchFiltersPanel() {
+export function SearchFiltersPanel({ showAccountFilter }: { showAccountFilter: boolean }) {
   const { t } = useTranslation();
   const filters = useSearchStore((state) => state.filters);
   const setFilter = useSearchStore((state) => state.setFilter);
   const apply = useSearchStore((state) => state.apply);
   const reset = useSearchStore((state) => state.reset);
   const tree = useQuery({ queryKey: ['mailboxes', 'tree'], queryFn: fetchMailboxTree });
+  const queryInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    queryInputRef.current?.focus();
+  }, []);
 
   const accountEntries = tree.data?.accounts ?? [];
-  const folderOptions = accountEntries
-    .filter((entry) => !filters.accountId || entry.account.id === filters.accountId)
-    .flatMap((entry) =>
-      [...entry.folders, ...entry.other].map((folder) => ({
-        id: folder.id,
-        label: `${entry.account.email} · ${folder.name}`,
-      })),
-    );
 
   const attachmentValue =
     filters.hasAttachment === 'with'
@@ -60,6 +58,7 @@ export function SearchFiltersPanel() {
             />
             <Input
               id="search-query"
+              ref={queryInputRef}
               value={filters.q}
               onChange={(event) => setFilter('q', event.target.value)}
               placeholder={t('search.queryPlaceholder')}
@@ -103,45 +102,28 @@ export function SearchFiltersPanel() {
         <SlidersHorizontal className="size-3.5" aria-hidden="true" />
         {t('search.filtersTitle')}
       </div>
-      <div className="mt-1.5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        <label className="block text-xs">
-          <span className="mb-1 block font-medium text-muted-foreground">{t('search.accountLabel')}</span>
-          <Select
-            value={filters.accountId || ALL}
-            onValueChange={(value) => setFilter('accountId', value === ALL ? '' : value)}
-          >
-            <SelectTrigger aria-label={t('search.accountLabel')}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>{t('common.allAccounts')}</SelectItem>
-              {accountEntries.map((entry) => (
-                <SelectItem key={entry.account.id} value={entry.account.id}>
-                  {entry.account.email}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
-        <label className="block text-xs">
-          <span className="mb-1 block font-medium text-muted-foreground">{t('search.folderLabel')}</span>
-          <Select
-            value={filters.mailboxId || ALL}
-            onValueChange={(value) => setFilter('mailboxId', value === ALL ? '' : value)}
-          >
-            <SelectTrigger aria-label={t('search.folderLabel')}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>{t('common.all')}</SelectItem>
-              {folderOptions.map((folder) => (
-                <SelectItem key={folder.id} value={folder.id}>
-                  {folder.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
+      <div className="mt-1.5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {showAccountFilter ? (
+          <label className="block text-xs">
+            <span className="mb-1 block font-medium text-muted-foreground">{t('search.accountLabel')}</span>
+            <Select
+              value={filters.accountId || ALL}
+              onValueChange={(value) => setFilter('accountId', value === ALL ? '' : value)}
+            >
+              <SelectTrigger aria-label={t('search.accountLabel')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>{t('common.allAccounts')}</SelectItem>
+                {accountEntries.map((entry) => (
+                  <SelectItem key={entry.account.id} value={entry.account.id}>
+                    {entry.account.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+        ) : null}
         <div className="block text-xs">
           <label htmlFor="search-recipient" className="mb-1 block font-medium text-muted-foreground">
             {t('search.recipientLabel')}

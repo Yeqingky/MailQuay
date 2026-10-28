@@ -9,7 +9,6 @@ const STATIC_VIEWS: Record<string, MailView> = {
   '/marked': 'marked',
   '/archive': 'archive',
   '/tasks': 'tasks',
-  '/search': 'search',
 };
 
 const FOLDER_PATH = /^\/accounts\/[^/]+\/mailboxes\/[^/]+\/?$/;

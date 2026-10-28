@@ -40,11 +40,10 @@ export type MailView =
   | 'marked'
   | 'archive'
   | 'tasks'
-  | 'search'
   | 'folder';
 
 interface FavoriteEntry {
-  view: Exclude<MailView, 'search' | 'folder'>;
+  view: Exclude<MailView, 'folder'>;
   href: string;
   label: string;
   icon: typeof Mail;
