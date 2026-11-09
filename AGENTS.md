@@ -222,6 +222,8 @@ pnpm generate:api
 - UI 过渡统一使用 `motion` (`motion/react`): 根节点 `MotionConfig` 固定 `reducedMotion="user"`, 通知堆叠和浮层收放使用 layout 与 `AnimatePresence`, 不新增同类 CSS keyframes; 宽度等非 transform 动画在 `prefers-reduced-motion` 下直接跳到目标值.
 - 不引入第二套组件库, 新组件优先放到 `components/ui` 或对应 feature.
 - pnpm 12 的依赖覆盖写入 `frontend/pnpm-workspace.yaml` 的 `overrides`, 不写入 `package.json` 的 `pnpm` 字段.
+- 桌面通知使用 Notification API, 默认关闭, 仅在用户打开开关并授权后发送; 只在页面不可见时提醒未读新邮件, 点击聚焦窗口并打开对应账号文件夹, 通知内容不写入后端. 通知只在页面打开时生效, 不实现 Web Push 或 Service Worker 后台推送.
+- 页面标题的未读数前缀和可选 App Badge 由 `lib/documentTitle` 统一合成, 页面标题仍通过 `useDocumentTitle` 设置.
 
 ## 7. 测试
 
@@ -237,7 +239,7 @@ pnpm generate:api
 - 资源检测和并发测试覆盖 cgroup v1/v2, Compose 限制, 回退值, 同步/拉取设置值和索引推荐值.
 - IMAP, POP3 和 SMTP 使用本地模拟服务, 测试不依赖真实邮箱账号.
 - 异步测试使用条件等待, 不使用固定 `sleep`.
-- 浏览器 e2e 使用 Playwright 和真实 full 构建, 由 `scripts/e2e-server.sh` 重建测试库并启动服务, 覆盖 owner 初始化, 登录, 导航, 任务中心, 搜索, 设置和主题; 不依赖外部邮箱服务.
+- 浏览器 e2e 使用 Playwright 和真实 full 构建, 由 `scripts/e2e-server.sh` 重建测试库并启动服务, 覆盖 owner 初始化, 登录, 导航, 任务中心, 搜索, 设置, 桌面通知和主题; 不依赖外部邮箱服务.
 - 不为了通过测试而放宽断言或删除既有契约测试.
 
 ## 8. 文档

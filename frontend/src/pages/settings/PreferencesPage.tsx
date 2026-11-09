@@ -45,6 +45,12 @@ export function PreferencesSettingsPage() {
   const queryClient = useQueryClient();
   const message = useErrorMessage();
   const setTheme = useUiStore((state) => state.setTheme);
+  const desktopNotifications = useUiStore((state) => state.desktopNotifications);
+  const setDesktopNotifications = useUiStore((state) => state.setDesktopNotifications);
+  const notificationsSupported = typeof window !== 'undefined' && 'Notification' in window;
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
+    () => (notificationsSupported ? Notification.permission : 'denied'),
+  );
   const [theme, setThemeValue] = useState<ThemePreference>('system');
   const [language, setLanguage] = useState<SupportedLanguage>('en');
   const [timezone, setTimezone] = useState('');
@@ -116,6 +122,28 @@ export function PreferencesSettingsPage() {
   });
 
   const avatarSettingsDisabled = !settings || saveAvatars.isPending;
+
+  const toggleDesktopNotifications = async (enabled: boolean) => {
+    if (!enabled) {
+      setDesktopNotifications(false);
+      return;
+    }
+    if (!notificationsSupported) return;
+    try {
+      const permission =
+        Notification.permission === 'granted'
+          ? 'granted'
+          : await Notification.requestPermission();
+      setNotificationPermission(permission);
+      if (permission === 'granted') {
+        setDesktopNotifications(true);
+        return;
+      }
+    } catch {
+      // Fall through to the error toast.
+    }
+    toast(t('settings.preferences.notificationsDenied'), { variant: 'destructive' });
+  };
 
   const runSave = () => {
     if (timezone.trim() !== '' && !isValidTimeZone(timezone.trim())) {
@@ -235,6 +263,34 @@ export function PreferencesSettingsPage() {
                 saveAvatars.mutate({ googleFaviconAvatars: enabled })
               }
               disabled={!networkAvatars || avatarSettingsDisabled}
+            />
+          }
+        />
+      </SettingsSection>
+
+      <SettingsDivider />
+
+      <SettingsSection
+        title={t('settings.preferences.notifications')}
+        description={t('settings.preferences.notificationsHint')}
+      >
+        <SettingsRow
+          title={t('settings.preferences.desktopNotifications')}
+          description={
+            !notificationsSupported
+              ? t('settings.preferences.notificationsUnsupported')
+              : notificationPermission === 'denied'
+                ? t('settings.preferences.notificationsBlocked')
+                : t('settings.preferences.desktopNotificationsHint')
+          }
+          htmlFor="settings-desktop-notifications"
+          control={
+            <Switch
+              id="settings-desktop-notifications"
+              checked={desktopNotifications && notificationPermission === 'granted'}
+              onCheckedChange={(enabled) => void toggleDesktopNotifications(enabled)}
+              disabled={!notificationsSupported || notificationPermission === 'denied'}
+              aria-label={t('settings.preferences.desktopNotifications')}
             />
           }
         />

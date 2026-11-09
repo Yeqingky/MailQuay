@@ -203,10 +203,13 @@ frontend/
 │   │   │   ├── client.ts           # openapi-fetch 实例
 │   │   │   └── errors.ts
 │   │   ├── events/useEventStream.ts
+│   │   ├── documentTitle.ts        # 标题未读数与 App Badge
 │   │   ├── mail/                   # HTML 清洗, 引用折叠, 地址格式化
 │   │   ├── format.ts
 │   │   └── utils.ts
 │   ├── hooks/
+│   │   ├── useBrowserNotifications.ts  # 桌面通知
+│   │   └── useUnreadBadge.ts       # 未读数标题与 App Badge
 │   ├── stores/
 │   │   ├── ui.ts                   # 侧边栏, 阅读器, 主题
 │   │   └── compose.ts              # 草稿面板状态
@@ -220,6 +223,7 @@ frontend/
 │   ├── auth.spec.ts
 │   ├── constants.ts
 │   ├── navigation.spec.ts
+│   ├── notifications.spec.ts
 │   ├── settings.spec.ts
 │   └── theme.spec.ts
 ```

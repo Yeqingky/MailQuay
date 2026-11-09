@@ -8,6 +8,8 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { TopBar } from '@/components/layout/TopBar';
 import { useAuthStatus } from '@/hooks/useAuth';
 import { useEventStream } from '@/lib/events/useEventStream';
+import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
+import { useUnreadBadge } from '@/hooks/useUnreadBadge';
 import {
   LIST_MIN_WIDTH,
   PANE_RESIZE_HANDLE_WIDTH,
@@ -28,6 +30,8 @@ export function AppLayout() {
   const currentView = mailViewFromPathname(pathname);
   const auth = useAuthStatus();
   useEventStream(true);
+  useBrowserNotifications();
+  useUnreadBadge();
   const sidebarWidth = useUiStore((state) => state.sidebarWidth);
   const setSidebarWidth = useUiStore((state) => state.setSidebarWidth);
   const sidebarStyle = { '--sidebar-width': `${sidebarWidth}px` } as CSSProperties;

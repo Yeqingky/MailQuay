@@ -26,6 +26,8 @@ interface UiState {
   toggleAccount: (accountId: string) => void;
   expandedOther: Record<string, boolean>;
   toggleOther: (accountId: string) => void;
+  desktopNotifications: boolean;
+  setDesktopNotifications: (enabled: boolean) => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -57,6 +59,8 @@ export const useUiStore = create<UiState>()(
             [accountId]: !state.expandedOther[accountId],
           },
         })),
+      desktopNotifications: false,
+      setDesktopNotifications: (desktopNotifications) => set({ desktopNotifications }),
     }),
     {
       name: 'mailquay:ui',
@@ -66,6 +70,7 @@ export const useUiStore = create<UiState>()(
         listWidth: state.listWidth,
         expandedAccounts: state.expandedAccounts,
         expandedOther: state.expandedOther,
+        desktopNotifications: state.desktopNotifications,
       }),
     },
   ),

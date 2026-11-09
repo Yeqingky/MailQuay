@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
+import { setPageTitle } from '@/lib/documentTitle';
 
 export function useDocumentTitle(title: string): void {
   useEffect(() => {
-    document.title = title ? `${title} · MailQuay` : 'MailQuay';
+    setPageTitle(title);
   }, [title]);
 }

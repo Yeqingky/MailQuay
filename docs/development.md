@@ -183,6 +183,8 @@ VITE_API_BASE_URL=http://127.0.0.1:8080/api/v1
 
 依赖覆盖写在 `frontend/pnpm-workspace.yaml` 的 `overrides`; pnpm 12 不再读取 `package.json` 的 `pnpm` 字段.
 
+桌面通知使用 Notification API, 开关和权限按浏览器保存在 `mailquay:ui` localStorage; 只在页面不可见时提醒未读新邮件, 点击聚焦窗口并打开对应账号文件夹. 需要 HTTPS 或 `localhost`, 且只在页面打开时生效; 关闭页面后的 Web Push 需要 Service Worker 和后端 VAPID, 当前未实现.
+
 ## 7. API 合同
 
 1. 先修改 `api/openapi.yaml`.
@@ -265,7 +267,7 @@ pnpm e2e
 - 写邮件窗口覆盖默认浮层, 设置为新窗口后的 `/compose` 通过 `window.name` 恢复草稿, 同一草稿聚焦已有窗口, 以及关闭前保存.
 - 阅读器顶部左侧是回复和转发, 右侧是标记, 本地归档和删除, 全部为图标按钮.
 - 设置页面覆盖独立布局, 分组路径和深链接, 关闭返回和保存反馈.
-- 浏览器 e2e 使用 Playwright 和真实 full 构建, 由 `scripts/e2e-server.sh` 重建测试库, 执行迁移, 构建内嵌前端的二进制并启动服务; 覆盖 owner 初始化, 登出和登录, 全局导航, 任务中心标签, 搜索面板, 设置深链接和主题持久化; 共享测试库, 固定单 worker 串行执行.
+- 浏览器 e2e 使用 Playwright 和真实 full 构建, 由 `scripts/e2e-server.sh` 重建测试库, 执行迁移, 构建内嵌前端的二进制并启动服务; 覆盖 owner 初始化, 登出和登录, 全局导航, 任务中心标签, 搜索面板, 设置深链接, 桌面通知和主题持久化; 共享测试库, 固定单 worker 串行执行.
 - 不测试实现细节, 不复制后端校验逻辑.
 
 浏览器 e2e:

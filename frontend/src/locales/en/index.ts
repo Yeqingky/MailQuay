@@ -220,6 +220,10 @@ const en = {
     newMessages_one: '{{count}} new message · click to view',
     newMessages_other: '{{count}} new messages · click to view',
   },
+  notifications: {
+    newMessages_one: '{{count}} new message',
+    newMessages_other: '{{count}} new messages',
+  },
   reader: {
     noSelectionTitle: 'Select a message',
     noSelectionBody: 'Choose a message from the list to read it here.',
@@ -690,6 +694,15 @@ const en = {
       appearance: 'Appearance',
       appearanceHint: 'Follow the system setting or force a light or dark interface.',
       languageHint: 'The interface and the backend language preference are updated together.',
+      notifications: 'Notifications',
+      notificationsHint: 'System alerts for new mail. These settings apply to this browser.',
+      desktopNotifications: 'Desktop notifications',
+      desktopNotificationsHint:
+        'Show a system notification when new mail arrives while this tab is in the background.',
+      notificationsBlocked:
+        'Notifications are blocked. Allow them for this site in the browser settings.',
+      notificationsUnsupported: 'This browser does not support desktop notifications.',
+      notificationsDenied: 'Notification permission was not granted.',
       networkAvatars: 'Network avatars',
       networkAvatarsHint:
         'Let the backend load sender avatars from Gravatar, BIMI, then the sender domain favicon. Turn off to block every avatar request on the server.',

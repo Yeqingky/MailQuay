@@ -220,6 +220,10 @@ const zhCN = {
     newMessages_one: '收到 {{count}} 封新邮件 · 点击查看',
     newMessages_other: '收到 {{count}} 封新邮件 · 点击查看',
   },
+  notifications: {
+    newMessages_one: '{{count}} 封新邮件',
+    newMessages_other: '{{count}} 封新邮件',
+  },
   reader: {
     noSelectionTitle: '选择一封邮件',
     noSelectionBody: '从列表中选择邮件即可在此阅读.',
@@ -683,6 +687,13 @@ const zhCN = {
       appearance: '外观',
       appearanceHint: '跟随系统, 或强制使用浅色 / 深色界面.',
       languageHint: '界面语言和后端语言偏好会同时更新.',
+      notifications: '通知',
+      notificationsHint: '新邮件的系统提醒. 这些设置仅对当前浏览器生效.',
+      desktopNotifications: '桌面通知',
+      desktopNotificationsHint: '页面在后台时, 新邮件通过系统通知提醒.',
+      notificationsBlocked: '通知已被浏览器阻止, 请在浏览器设置中允许本站通知.',
+      notificationsUnsupported: '当前浏览器不支持桌面通知.',
+      notificationsDenied: '未获得通知权限.',
       networkAvatars: '启用网络头像',
       networkAvatarsHint:
         '由后端依次从 Gravatar, BIMI 和 Google favicon 获取发信人头像. 关闭后服务端不再发起任何头像请求.',
