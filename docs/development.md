@@ -178,6 +178,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8080/api/v1
 | `pnpm lint` | ESLint |
 | `pnpm typecheck` | TypeScript 检查 |
 | `pnpm test` | Vitest 单元测试 |
+| `pnpm e2e` | Playwright 浏览器端到端测试 |
 | `pnpm generate:api` | 从 `../api/openapi.yaml` 生成类型 |
 
 ## 7. API 合同
@@ -252,6 +253,7 @@ MAILQUAY_TEST_DATABASE_URL='postgres://mailquay:mailquay@127.0.0.1:5432/mailquay
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm e2e
 ```
 
 - 单元测试覆盖纯函数: HTML 清洗, 地址解析, 时间格式, 游标处理, 任务进度聚合.
@@ -261,8 +263,21 @@ pnpm test
 - 写邮件窗口覆盖默认浮层, 设置为新窗口后的 `/compose` 通过 `window.name` 恢复草稿, 同一草稿聚焦已有窗口, 以及关闭前保存.
 - 阅读器顶部左侧是回复和转发, 右侧是标记, 本地归档和删除, 全部为图标按钮.
 - 设置页面覆盖独立布局, 分组路径和深链接, 关闭返回和保存反馈.
-- Playwright 使用 mock API 覆盖登录, 列表, 阅读, 写邮件主流程, 设置跳转, 以及多任务同时运行时的任务面板.
+- 浏览器 e2e 使用 Playwright 和真实 full 构建, 由 `scripts/e2e-server.sh` 重建测试库, 执行迁移, 构建内嵌前端的二进制并启动服务; 覆盖 owner 初始化, 登出和登录, 全局导航, 任务中心标签, 搜索面板, 设置深链接和主题持久化; 共享测试库, 固定单 worker 串行执行.
 - 不测试实现细节, 不复制后端校验逻辑.
+
+浏览器 e2e:
+
+```sh
+export MAILQUAY_TEST_DATABASE_URL='postgres://mailquay:mailquay@127.0.0.1:5432/mailquay_e2e?sslmode=disable'
+cd frontend
+corepack pnpm exec playwright install chromium
+corepack pnpm e2e
+```
+
+- 测试库名必须包含 `test` 或 `e2e`; 脚本会重建 `public` schema.
+- 服务默认监听 `127.0.0.1:18080`, 可用 `MAILQUAY_E2E_PORT` 修改.
+- 每次运行 `pnpm e2e` 都会重建前端和 full 二进制, 只改测试时也会重建, 保证与当前代码一致.
 
 ### 8.3 断言原则
 
@@ -386,14 +401,15 @@ docker compose -f docker-compose-dev.yml up -d --build
 
 ### 11.5 工作流
 
-- 工作流: `.github/workflows/release.yml` (标签发布) 和 `.github/workflows/gitea-mirror.yml` (Gitea 镜像); 不保留 push/PR CI.
+- 工作流: `e2e.yml` (push `main` 和 PR), `release.yml` (标签发布), `gitea-mirror.yml` (push).
+- `e2e.yml` 在 push `main` 和 PR 上安装 Chromium, 通过 `scripts/e2e-server.sh` 重建测试库并运行 Playwright; 失败时上传 `playwright-report` 和 `test-results`.
 - `release.yml` 只在 push `v*` 标签时触发; `frontend` job 从同仓库 `frontend/` 构建 `dist`, `binaries` 矩阵编译含前端的 `mailquay`, `images` job 构建 `full-prebuilt` 镜像.
 - `binaries` 与 `images` 全部完成后, `publish` job 合并产物, 生成 `checksums.txt`, 创建或更新 Release.
 - 镜像标签: `vX.Y.Z`, `latest` 和 7 位短提交哈希.
 - Docker 镜像使用 BuildKit 多架构构建; Dockerfile 的 Go 编译阶段按 `TARGETOS`/`TARGETARCH` 交叉编译, 只在运行阶段使用目标架构基础镜像.
 - `gitea-mirror.yml` 在每次 push 和手动触发时, 使用机密 `GITEA_ACCESS_TOKEN` 通过 HTTPS 将全部分支和标签镜像到 `https://git.ovh.im/yeqing/MailQuay`.
-- 所有工作流的 job 必须设置 `timeout-minutes`: 发布前端 20, 二进制矩阵 30, 镜像 45, 发布上传 10, Gitea 镜像 15.
-- 联网步骤必须加命令级 `timeout`: `corepack pnpm install` 900 秒, `corepack pnpm build` 600 秒, Gitea 推送 300 秒.
+- 所有工作流的 job 必须设置 `timeout-minutes`: e2e 30, 发布前端 20, 二进制矩阵 30, 镜像 45, 发布上传 10, Gitea 镜像 15.
+- 联网步骤必须加命令级 `timeout`: `corepack pnpm install` 900 秒, `corepack pnpm build` 600 秒, Chromium 安装 600 秒, e2e 1200 秒, Gitea 推送 300 秒.
 - 平台矩阵使用 `fail-fast: false`, 单个平台失败不取消其他平台产物.
 - 前端依赖安装统一由 `corepack` 读取 `package.json` 的 `packageManager` 决定 pnpm 版本, 工作流不固定 pnpm 版本, 避免 `ERR_PNPM_BAD_PM_VERSION`.
 - 标签工作流必须等构建全部成功后再创建或更新 Release.

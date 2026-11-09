@@ -114,8 +114,11 @@ pnpm build
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm e2e
 pnpm generate:api
 ```
+
+Browser e2e builds the full stack and requires `MAILQUAY_TEST_DATABASE_URL`; see `../docs/development.md`.
 
 ## Deployment
 

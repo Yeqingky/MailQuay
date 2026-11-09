@@ -17,6 +17,7 @@
 - 删除 push/PR CI 工作流, 只保留标签触发的发布工作流和 push 触发的 Gitea 镜像工作流.
 - Release 只发布含前端的 `mailquay` 二进制包和 Docker 镜像, 不再发布 `mailquay-core` 与 `-core` 镜像.
 - 新增 `gitea-mirror` 工作流, 每次 push 和手动触发时通过 `GITEA_ACCESS_TOKEN` 将全部分支和标签镜像到 `https://git.ovh.im/yeqing/MailQuay`.
+- 新增 Playwright 浏览器 e2e: `scripts/e2e-server.sh` 重建测试库并启动 full 构建, 覆盖 owner 初始化, 登录, 导航, 任务中心, 搜索, 设置和主题; 新增 push/PR `e2e` 工作流.
 
 ### 修复
 

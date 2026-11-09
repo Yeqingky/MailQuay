@@ -113,8 +113,11 @@ pnpm build
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm e2e
 pnpm generate:api
 ```
+
+浏览器 e2e 会构建 full 栈, 需要 `MAILQUAY_TEST_DATABASE_URL`; 详见 `../docs/development.md`.
 
 ## 部署
 

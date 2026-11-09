@@ -135,6 +135,7 @@ pnpm build
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm e2e
 pnpm generate:api
 ```
 
@@ -235,6 +236,7 @@ pnpm generate:api
 - 资源检测和并发测试覆盖 cgroup v1/v2, Compose 限制, 回退值, 同步/拉取设置值和索引推荐值.
 - IMAP, POP3 和 SMTP 使用本地模拟服务, 测试不依赖真实邮箱账号.
 - 异步测试使用条件等待, 不使用固定 `sleep`.
+- 浏览器 e2e 使用 Playwright 和真实 full 构建, 由 `scripts/e2e-server.sh` 重建测试库并启动服务, 覆盖 owner 初始化, 登录, 导航, 任务中心, 搜索, 设置和主题; 不依赖外部邮箱服务.
 - 不为了通过测试而放宽断言或删除既有契约测试.
 
 ## 8. 文档
@@ -253,7 +255,7 @@ pnpm generate:api
 - 发布只走 GitHub Actions; 前端和后端同仓库同版本号, 由同一个 tag 生成 Release, 多平台二进制和 Docker 镜像.
 - 发布只提供含前端的 `mailquay` 二进制和 Docker 镜像; `mailquay-core` 不进入 Release. 含前端版在编译期嵌入前端, 不得用运行时开关伪装.
 - 后端发布在 `.github/workflows/release.yml` 内先构建 `frontend/` 一次, 再编译含前端的 `mailquay`; 全部成功后才创建 Release, 不维护单独的前端版本文件.
-- 仓库不保留 push/PR CI; 工作流只有标签触发的 `release.yml` 和 push 触发的 `gitea-mirror.yml`.
+- 工作流: `e2e.yml` (push `main` 和 PR), `release.yml` (标签发布), `gitea-mirror.yml` (push).
 - `gitea-mirror.yml` 在每次 push 和手动触发时使用 `GITEA_ACCESS_TOKEN`, 将全部分支和标签镜像到 `https://git.ovh.im/yeqing/MailQuay`.
 - 后端二进制覆盖 linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64, windows/arm64; Docker 只做 linux/amd64 和 linux/arm64.
 - 代码和产物文件名使用 `darwin`, 用户界面和发布说明写 `macOS`; 不手工创建 Release 绕过工作流.

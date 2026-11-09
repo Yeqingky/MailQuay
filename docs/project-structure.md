@@ -82,11 +82,14 @@ MailQuay/
 │   ├── development.md
 │   └── questions/                   # 待确认问题, 按编号分隔
 ├── test/
-│   └── integration/                 # PostgreSQL, IMAP/POP3/SMTP 测试夹具
+│   ├── integration/                 # PostgreSQL, IMAP/POP3/SMTP 测试夹具
+│   └── e2e/resetdb/                 # 重建 e2e 测试库
 ├── scripts/
+│   ├── e2e-server.sh                # 构建并启动 e2e full 栈
 │   └── new-database.sh              # 创建并切换到新的开发数据库
 └── .github/
     └── workflows/
+        ├── e2e.yml                  # push/PR 浏览器 e2e
         ├── gitea-mirror.yml         # push 后镜像到 Gitea
         └── release.yml              # 标签构建二进制和镜像, 全部成功后发布
 ```
@@ -143,6 +146,7 @@ frontend/
 ├── package.json
 ├── pnpm-lock.yaml
 ├── vite.config.ts
+├── playwright.config.ts
 ├── tsconfig.json
 ├── tsconfig.app.json
 ├── tsconfig.node.json
@@ -210,6 +214,13 @@ frontend/
 │   │   └── zh-CN/
 │   └── styles/
 │       └── index.css               # Tailwind v4, 主题变量, 字体
+├── e2e/
+│   ├── auth.setup.ts
+│   ├── auth.spec.ts
+│   ├── constants.ts
+│   ├── navigation.spec.ts
+│   ├── settings.spec.ts
+│   └── theme.spec.ts
 ```
 
 ### 3.1 前端模块

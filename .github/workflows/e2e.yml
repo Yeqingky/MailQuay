@@ -1,0 +1,56 @@
+name: e2e
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: mailquay
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: mailquay_e2e
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mailquay -d mailquay_e2e"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MAILQUAY_TEST_DATABASE_URL: postgres://mailquay@127.0.0.1:5432/mailquay_e2e?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.3"
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: install frontend dependencies
+        working-directory: frontend
+        run: timeout 900 corepack pnpm install --frozen-lockfile
+      - name: install Chromium
+        working-directory: frontend
+        run: timeout 600 corepack pnpm exec playwright install --with-deps chromium
+      - name: run browser e2e
+        working-directory: frontend
+        run: timeout 1200 corepack pnpm e2e
+      - name: upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          retention-days: 7
