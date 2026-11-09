@@ -32,6 +32,9 @@ interface UiState {
   setNotificationSound: (enabled: boolean) => void;
   pushActive: boolean;
   setPushActive: (active: boolean) => void;
+  notificationPromptRequested: boolean;
+  requestNotificationPrompt: () => void;
+  dismissNotificationPrompt: () => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -69,6 +72,9 @@ export const useUiStore = create<UiState>()(
       setNotificationSound: (notificationSound) => set({ notificationSound }),
       pushActive: false,
       setPushActive: (pushActive) => set({ pushActive }),
+      notificationPromptRequested: false,
+      requestNotificationPrompt: () => set({ notificationPromptRequested: true }),
+      dismissNotificationPrompt: () => set({ notificationPromptRequested: false }),
     }),
     {
       name: 'mailquay:ui',

@@ -547,6 +547,7 @@ HTTP 层注意:
 ### 5.1 Web Push
 
 - 桌面通知使用 Notification API 与 Web Push. 用户打开开关并授权后, 前端注册 `/sw.js`, 通过 `GET /push/vapid` 获取公钥并调用 `PushManager.subscribe`.
+- 登录动作成功后, 若当前浏览器未启用桌面通知且权限未被拒绝, 右下角显示启用提示; 关闭后到下次登录前不再显示, 普通页面访问和刷新不触发.
 - 订阅通过 `POST /push/subscriptions` 存入 PostgreSQL `push_subscriptions`; 每条订阅保存 `sound` 标志, 退出登录时删除当前浏览器的订阅.
 - VAPID 私钥和公钥保存在数据目录 `vapid.json` (权限 0600), `MAILQUAY_VAPID_SUBJECT` 提供 VAPID 联系地址.
 - `internal/push` 订阅进程内事件总线, 对未读 `message.new` 做 1 秒合并, 通过 Web Push 发送 `title`, `body`, `url` 和 `silent`; 推送服务返回 404 或 410 时删除过期订阅.

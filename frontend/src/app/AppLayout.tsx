@@ -4,6 +4,7 @@ import { Outlet, useLocation } from 'react-router';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { PaneResizeHandle } from '@/components/ui/pane-resize-handle';
 import { InsecureTransportBanner } from '@/components/layout/InsecureTransportBanner';
+import { NotificationPrompt } from '@/components/layout/NotificationPrompt';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { TopBar } from '@/components/layout/TopBar';
 import { useAuthStatus } from '@/hooks/useAuth';
@@ -82,6 +83,7 @@ export function AppLayout() {
       </div>
       {settingsOpen ? <Outlet /> : null}
       <ComposeOverlay />
+      <NotificationPrompt />
     </div>
   );
 }

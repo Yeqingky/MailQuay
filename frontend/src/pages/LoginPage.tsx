@@ -14,6 +14,7 @@ import { useErrorMessage } from '@/hooks/useErrorMessage';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { applyLanguage } from '@/lib/i18n';
 import { API_BASE_URL } from '@/lib/api/client';
+import { useUiStore } from '@/stores/ui';
 
 export function LoginPage() {
   const { t, i18n } = useTranslation();
@@ -29,6 +30,7 @@ export function LoginPage() {
   const login = useMutation({
     mutationFn: loginRequest,
     onSuccess: async () => {
+      useUiStore.getState().requestNotificationPrompt();
       await queryClient.invalidateQueries({ queryKey: authKeys.me });
       navigate('/', { replace: true });
     },

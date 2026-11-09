@@ -223,6 +223,8 @@ const en = {
   notifications: {
     newMessages_one: '{{count}} new message',
     newMessages_other: '{{count}} new messages',
+    prompt: 'Turn on browser notifications',
+    enable: 'Enable',
   },
   reader: {
     noSelectionTitle: 'Select a message',

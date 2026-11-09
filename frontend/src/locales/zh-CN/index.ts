@@ -223,6 +223,8 @@ const zhCN = {
   notifications: {
     newMessages_one: '{{count}} 封新邮件',
     newMessages_other: '{{count}} 封新邮件',
+    prompt: '开启浏览器通知',
+    enable: '启用',
   },
   reader: {
     noSelectionTitle: '选择一封邮件',

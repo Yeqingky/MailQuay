@@ -13,6 +13,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/components/ui/toast';
 import { useAuthStatus } from '@/hooks/useAuth';
+import { useDesktopNotifications } from '@/hooks/useDesktopNotifications';
 import { useErrorMessage } from '@/hooks/useErrorMessage';
 import { updateProfile } from '@/features/auth/api';
 import { fetchSettings, settingsKeys, updateSettings, type SettingsUpdate } from '@/features/settings/api';
@@ -45,15 +46,16 @@ export function PreferencesSettingsPage() {
   const settingsQuery = useQuery({ queryKey: settingsKeys.detail, queryFn: fetchSettings });
   const queryClient = useQueryClient();
   const message = useErrorMessage();
+  const {
+    supported: notificationsSupported,
+    enabled: desktopNotifications,
+    permission: notificationPermission,
+    request: requestNotifications,
+    disable: disableNotifications,
+  } = useDesktopNotifications();
   const setTheme = useUiStore((state) => state.setTheme);
-  const desktopNotifications = useUiStore((state) => state.desktopNotifications);
-  const setDesktopNotifications = useUiStore((state) => state.setDesktopNotifications);
   const notificationSound = useUiStore((state) => state.notificationSound);
   const setNotificationSound = useUiStore((state) => state.setNotificationSound);
-  const notificationsSupported = typeof window !== 'undefined' && 'Notification' in window;
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
-    () => (notificationsSupported ? Notification.permission : 'denied'),
-  );
   const [theme, setThemeValue] = useState<ThemePreference>('system');
   const [language, setLanguage] = useState<SupportedLanguage>('en');
   const [timezone, setTimezone] = useState('');
@@ -125,28 +127,6 @@ export function PreferencesSettingsPage() {
   });
 
   const avatarSettingsDisabled = !settings || saveAvatars.isPending;
-
-  const toggleDesktopNotifications = async (enabled: boolean) => {
-    if (!enabled) {
-      setDesktopNotifications(false);
-      return;
-    }
-    if (!notificationsSupported) return;
-    try {
-      const permission =
-        Notification.permission === 'granted'
-          ? 'granted'
-          : await Notification.requestPermission();
-      setNotificationPermission(permission);
-      if (permission === 'granted') {
-        setDesktopNotifications(true);
-        return;
-      }
-    } catch {
-      // Fall through to the error toast.
-    }
-    toast(t('settings.preferences.notificationsDenied'), { variant: 'destructive' });
-  };
 
   const runSave = () => {
     if (timezone.trim() !== '' && !isValidTimeZone(timezone.trim())) {
@@ -291,7 +271,10 @@ export function PreferencesSettingsPage() {
             <Switch
               id="settings-desktop-notifications"
               checked={desktopNotifications && notificationPermission === 'granted'}
-              onCheckedChange={(enabled) => void toggleDesktopNotifications(enabled)}
+              onCheckedChange={(enabled) => {
+                if (enabled) void requestNotifications();
+                else disableNotifications();
+              }}
               disabled={!notificationsSupported || notificationPermission === 'denied'}
               aria-label={t('settings.preferences.desktopNotifications')}
             />

@@ -13,6 +13,7 @@ import { useAuthStatus } from '@/hooks/useAuth';
 import { useErrorMessage } from '@/hooks/useErrorMessage';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { isApiError } from '@/lib/api/errors';
+import { useUiStore } from '@/stores/ui';
 
 export function SetupPage() {
   const { t } = useTranslation();
@@ -30,6 +31,7 @@ export function SetupPage() {
   const setup = useMutation({
     mutationFn: setupOwner,
     onSuccess: async () => {
+      useUiStore.getState().requestNotificationPrompt();
       await queryClient.invalidateQueries({ queryKey: authKeys.me });
       navigate('/', { replace: true });
     },
