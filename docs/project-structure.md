@@ -87,8 +87,8 @@ MailQuay/
 │   └── new-database.sh              # 创建并切换到新的开发数据库
 └── .github/
     └── workflows/
-        ├── ci.yml                   # lint, test, core/full 构建
-        └── release.yml              # core 与 full 并行构建, 全部成功后发布
+        ├── gitea-mirror.yml         # push 后镜像到 Gitea
+        └── release.yml              # 标签构建二进制和镜像, 全部成功后发布
 ```
 
 ### 2.1 后端模块
@@ -129,7 +129,7 @@ MailQuay/
 - PostgreSQL 使用 `JSONB`, `TIMESTAMPTZ`, 部分索引和唯一索引.
 - 迁移只维护 `migrations/postgres`, 使用 goose; 不保留第二套方言.
 - 事务边界在业务包, `store` 提供 `WithTx`; 索引任务和邮件写入在同一事务提交.
-- CI 只启动 PostgreSQL 服务, 不维护 SQLite 测试矩阵.
+- 测试只使用 PostgreSQL, 不维护 SQLite 测试矩阵.
 
 ## 3. frontend 目录
 
@@ -210,12 +210,6 @@ frontend/
 │   │   └── zh-CN/
 │   └── styles/
 │       └── index.css               # Tailwind v4, 主题变量, 字体
-├── e2e/
-│   └── mail.spec.ts
-└── .github/
-    └── workflows/
-        ├── ci.yml
-        └── release.yml              # 标签构建并生成 Release
 ```
 
 ### 3.1 前端模块

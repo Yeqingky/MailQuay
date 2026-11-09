@@ -14,7 +14,9 @@
 - 批量同步不再逐封推送 `message.new`: 首次同步, UIDVALIDITY 重置或一次新增超过 50 封时改为每秒最多一条 `mailbox.updated` 进度事件, 同步结束, 失败或取消时补发最终事件.
 - `message.new` 附带列表行所需的轻量摘要 (不含正文和附件), IDLE 与增量新邮件可直接插入列表.
 - 前端不再按事件逐封请求 `GET /messages/{id}`: 缺摘要时合并为一次列表刷新, SSE 引发的缓存失效按 1-1.5 秒窗口合并, 页面重新可见时校准计数和任务.
-- CI 只保留后端和前端校验, 不再构建和推送提交级 Docker 镜像; Docker 镜像和 Release 只由标签触发的 `release.yml` 产出.
+- 删除 push/PR CI 工作流, 只保留标签触发的发布工作流和 push 触发的 Gitea 镜像工作流.
+- Release 只发布含前端的 `mailquay` 二进制包和 Docker 镜像, 不再发布 `mailquay-core` 与 `-core` 镜像.
+- 新增 `gitea-mirror` 工作流, 每次 push 和手动触发时通过 `GITEA_ACCESS_TOKEN` 将全部分支和标签镜像到 `https://git.ovh.im/yeqing/MailQuay`.
 
 ### 修复
 

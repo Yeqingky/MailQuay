@@ -178,7 +178,6 @@ VITE_API_BASE_URL=http://127.0.0.1:8080/api/v1
 | `pnpm lint` | ESLint |
 | `pnpm typecheck` | TypeScript 检查 |
 | `pnpm test` | Vitest 单元测试 |
-| `pnpm e2e` | Playwright 端到端测试 |
 | `pnpm generate:api` | 从 `../api/openapi.yaml` 生成类型 |
 
 ## 7. API 合同
@@ -194,8 +193,6 @@ VITE_API_BASE_URL=http://127.0.0.1:8080/api/v1
 ```sh
 make api-lint
 ```
-
-CI 会校验生成文件与合同一致, 不一致直接失败.
 
 ## 8. 测试
 
@@ -255,7 +252,6 @@ MAILQUAY_TEST_DATABASE_URL='postgres://mailquay:mailquay@127.0.0.1:5432/mailquay
 pnpm lint
 pnpm typecheck
 pnpm test
-pnpm e2e
 ```
 
 - 单元测试覆盖纯函数: HTML 清洗, 地址解析, 时间格式, 游标处理, 任务进度聚合.
@@ -328,7 +324,7 @@ docs(architecture): clarify SSE replay window
 ### 11.1 版本与发布顺序
 
 - 使用 SemVer, 标签格式 `vX.Y.Z`; 前端和后端使用完全相同的版本号, 同仓库只有一个 tag, 不维护单独的前端版本文件.
-- 打一个 `vX.Y.Z` 标签, `release.yml` 在同一工作流内先构建 `frontend/`, 再并行编译 core 和 full 两种形态.
+- 打一个 `vX.Y.Z` 标签, `release.yml` 在同一工作流内先构建 `frontend/`, 再编译含前端的 `mailquay` 二进制和 Docker 镜像.
 - 所有构建全部成功后, 同一个工作流的 `publish` job 才创建 Release; 任一 job 失败都不发布, 修复后重新运行整个工作流.
 
 ### 11.2 两种后端形态
@@ -338,6 +334,7 @@ docs(architecture): clarify SSE replay window
 | 含前端版 | `mailquay` | 后端 API 加已构建前端静态资源 | 单个 exe 或 Compose 同时提供前后端 |
 | 不含前端版 | `mailquay-core` | 仅后端 API | 单独运行, 前端由外部 nginx 或静态托管提供 |
 
+- 发布只提供含前端版; 不含前端版保留源码构建能力, 不进入 Release 产物.
 - 含前端版在编译时通过 Go `embed` 打入 `web/dist`, 使用构建标签 `full`; 不是运行时开关.
 - 不含前端版不编译静态资源包, 不注册静态文件路由; 不是"监听端口但不服务页面".
 - 含前端版同一端口提供 `/api/v1` 和静态资源; 静态文件命中时直接返回, 其余 GET/HEAD 路径回落到 `index.html` 交给客户端路由, `/api` 路径仍返回 JSON 404.
@@ -356,17 +353,16 @@ docs(architecture): clarify SSE replay window
 | Windows ARM64 | `windows` | `arm64` | 可选 |
 
 - 代码, 工作流和产物文件名统一使用 `darwin`; 发布说明和用户界面写 `macOS`.
-- 两种形态都覆盖上述平台.
-- 产物命名: `mailquay_<version>_<goos>_<goarch>.tar.gz` 和 `mailquay-core_...`; Windows 使用 `.zip`.
+- 发布产物覆盖上述平台.
+- 产物命名: `mailquay_<version>_<goos>_<goarch>.tar.gz`; Windows 使用 `.zip`.
 - 使用 `CGO_ENABLED=0` 生成静态二进制, 通过 `-ldflags` 注入版本和提交号.
 - 同时生成 `checksums.txt`.
 - macOS 二进制暂不签名和公证; Windows 不提供安装器, 只提供压缩包.
 
 ### 11.4 Docker 镜像与 Compose
 
-- 含前端镜像: `ghcr.io/yeqingky/mailquay:vX.Y.Z`, `ghcr.io/yeqingky/mailquay:latest`, `ghcr.io/yeqingky/mailquay:<短提交哈希>`.
-- 不含前端镜像: 同一镜像仓库, 标签追加 `-core`: `ghcr.io/yeqingky/mailquay:vX.Y.Z-core`, `ghcr.io/yeqingky/mailquay:latest-core`, `ghcr.io/yeqingky/mailquay:<短提交哈希>-core`.
-- 两个镜像都支持 `linux/amd64` 和 `linux/arm64` 多架构 manifest.
+- 镜像: `ghcr.io/yeqingky/mailquay:vX.Y.Z`, `ghcr.io/yeqingky/mailquay:latest`, `ghcr.io/yeqingky/mailquay:<短提交哈希>`.
+- 镜像支持 `linux/amd64` 和 `linux/arm64` 多架构 manifest.
 - 前端不提供容器镜像. 静态构建产物部署到 Cloudflare Pages 等静态平台, 或由含前端版后端内嵌.
 - `docker-compose.yml`: 使用 `ghcr.io/yeqingky/mailquay` 发布镜像, 前后端同端口提供; 状态目录使用仓库内挂载 `./data` (uid/gid 101) 和 `./pg_data` (uid 70, 权限 750).
 - `docker-compose-dev.yml`: 本地构建 `full` 镜像, 构建时从 `./frontend` 编译前端并内嵌; 单个 `mailquay` 容器同时提供前后端, 容器内不运行 Node 进程.
@@ -390,17 +386,17 @@ docker compose -f docker-compose-dev.yml up -d --build
 
 ### 11.5 工作流
 
-- 工作流: `.github/workflows/ci.yml`, `.github/workflows/release.yml`; 发布工作流按平台矩阵直接编译并上传产物.
-- `ci.yml` 只做校验, 不推送任何发布产物: `backend` 运行 vet, 测试, 构建和生成代码检查; `frontend` 在仓库内构建 `frontend/`, 复制到 `internal/webassets` 后执行 `make build-full` 验证内嵌构建, 不依赖外部前端仓库.
+- 工作流: `.github/workflows/release.yml` (标签发布) 和 `.github/workflows/gitea-mirror.yml` (Gitea 镜像); 不保留 push/PR CI.
+- `release.yml` 只在 push `v*` 标签时触发; `frontend` job 从同仓库 `frontend/` 构建 `dist`, `binaries` 矩阵编译含前端的 `mailquay`, `images` job 构建 `full-prebuilt` 镜像.
+- `binaries` 与 `images` 全部完成后, `publish` job 合并产物, 生成 `checksums.txt`, 创建或更新 Release.
+- 镜像标签: `vX.Y.Z`, `latest` 和 7 位短提交哈希.
 - Docker 镜像使用 BuildKit 多架构构建; Dockerfile 的 Go 编译阶段按 `TARGETOS`/`TARGETARCH` 交叉编译, 只在运行阶段使用目标架构基础镜像.
-- 后端 `release.yml` 的 `frontend` job 从同仓库 `frontend/` 构建 `dist`; `binaries` 矩阵每个平台同时编译 `mailquay-core` 和 `mailquay`; `images` 矩阵并行构建 `full-prebuilt` 和 `core` 镜像.
-- `binaries` 与 `images` 全部完成后, `publish` job 合并全部产物, 生成 `checksums.txt`, 创建或更新 Release.
-- 镜像标签: 含前端版 `vX.Y.Z`, `latest` 和 7 位短提交哈希; 仅后端版在标签末尾追加 `-core`.
-- 所有工作流的 job 必须设置 `timeout-minutes`: 后端 CI 40, 前端 CI 30, 发布前端 20, 二进制矩阵 30, 镜像矩阵 45, 发布上传 10.
-- 联网步骤必须加命令级 `timeout`: `corepack pnpm install` 900 秒, `corepack pnpm build` 600 秒.
+- `gitea-mirror.yml` 在每次 push 和手动触发时, 使用机密 `GITEA_ACCESS_TOKEN` 通过 HTTPS 将全部分支和标签镜像到 `https://git.ovh.im/yeqing/MailQuay`.
+- 所有工作流的 job 必须设置 `timeout-minutes`: 发布前端 20, 二进制矩阵 30, 镜像 45, 发布上传 10, Gitea 镜像 15.
+- 联网步骤必须加命令级 `timeout`: `corepack pnpm install` 900 秒, `corepack pnpm build` 600 秒, Gitea 推送 300 秒.
 - 平台矩阵使用 `fail-fast: false`, 单个平台失败不取消其他平台产物.
 - 前端依赖安装统一由 `corepack` 读取 `package.json` 的 `packageManager` 决定 pnpm 版本, 工作流不固定 pnpm 版本, 避免 `ERR_PNPM_BAD_PM_VERSION`.
-- 标签工作流必须等测试和构建全部成功后再创建或更新 Release.
+- 标签工作流必须等构建全部成功后再创建或更新 Release.
 - 发布工作流失败时修复并重新运行, 不手工创建 Release 绕过工作流.
 
 ### 11.6 发布说明

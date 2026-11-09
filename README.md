@@ -34,7 +34,7 @@ MailQuay is not a mail server. It does not run an MTA, does not own a domain, an
 - Structured search combines subject/all mode with account, recipient, sender, and attachment filters; the folder scope follows the current view.
 - Unified views deduplicate the same message across folders with a stable provider ID, Message-ID, or content hash fallback.
 - Non-HTTPS access outside loopback and private ranges shows a permanent red warning above the app.
-- Two backend builds: `mailquay` with embedded frontend assets, and `mailquay-core` as API-only.
+- Release ships `mailquay` with embedded frontend assets; `mailquay-core` remains an API-only source build.
 - Centered settings dialog over the mail shell with dedicated navigation, account settings, sync, and appearance.
 - OAuth2 (XOAUTH2) for providers that require it, plus app passwords for generic IMAP or POP3 servers.
 - Server-sent events for new mail, flag changes, task progress, outbox state, and the runtime log console.

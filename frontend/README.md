@@ -114,7 +114,6 @@ pnpm build
 pnpm lint
 pnpm typecheck
 pnpm test
-pnpm e2e
 pnpm generate:api
 ```
 
