@@ -391,14 +391,12 @@ docker compose -f docker-compose-dev.yml up -d --build
 ### 11.5 工作流
 
 - 工作流: `.github/workflows/ci.yml`, `.github/workflows/release.yml`; 发布工作流按平台矩阵直接编译并上传产物.
-- `ci.yml` 的 `frontend` job 在仓库内 `frontend/` 执行 `corepack pnpm install --frozen-lockfile` 和 `corepack pnpm build`, 上传 `dist` 作为共享 artifact; `images` job 将该 artifact 作为 `frontend` 构建上下文.
-- 后端 `ci.yml` 在 `main` 提交和同仓库 PR 上构建并推送 commit 级镜像: `ghcr.io/yeqingky/mailquay:<7 位短提交>` 和 `:<7 位短提交>-core`; fork PR 只构建不推送, PR 使用 head commit 的短哈希.
-- 镜像构建使用 BuildKit 多架构和 GHA 缓存; Dockerfile 的 Go 编译阶段按 `TARGETOS`/`TARGETARCH` 交叉编译, 只在运行阶段使用目标架构基础镜像.
-- `ci.yml` 的 `frontend` job 同时构建内嵌二进制 (`make build-full`), 不依赖任何外部前端仓库.
+- `ci.yml` 只做校验, 不推送任何发布产物: `backend` 运行 vet, 测试, 构建和生成代码检查; `frontend` 在仓库内构建 `frontend/`, 复制到 `internal/webassets` 后执行 `make build-full` 验证内嵌构建, 不依赖外部前端仓库.
+- Docker 镜像使用 BuildKit 多架构构建; Dockerfile 的 Go 编译阶段按 `TARGETOS`/`TARGETARCH` 交叉编译, 只在运行阶段使用目标架构基础镜像.
 - 后端 `release.yml` 的 `frontend` job 从同仓库 `frontend/` 构建 `dist`; `binaries` 矩阵每个平台同时编译 `mailquay-core` 和 `mailquay`; `images` 矩阵并行构建 `full-prebuilt` 和 `core` 镜像.
 - `binaries` 与 `images` 全部完成后, `publish` job 合并全部产物, 生成 `checksums.txt`, 创建或更新 Release.
 - 镜像标签: 含前端版 `vX.Y.Z`, `latest` 和 7 位短提交哈希; 仅后端版在标签末尾追加 `-core`.
-- 所有工作流的 job 必须设置 `timeout-minutes`: 后端 CI 40/30/45, 发布前端 20, 二进制矩阵 30, 镜像矩阵 45, 发布上传 10, 前端构建 30.
+- 所有工作流的 job 必须设置 `timeout-minutes`: 后端 CI 40, 前端 CI 30, 发布前端 20, 二进制矩阵 30, 镜像矩阵 45, 发布上传 10.
 - 联网步骤必须加命令级 `timeout`: `corepack pnpm install` 900 秒, `corepack pnpm build` 600 秒.
 - 平台矩阵使用 `fail-fast: false`, 单个平台失败不取消其他平台产物.
 - 前端依赖安装统一由 `corepack` 读取 `package.json` 的 `packageManager` 决定 pnpm 版本, 工作流不固定 pnpm 版本, 避免 `ERR_PNPM_BAD_PM_VERSION`.
