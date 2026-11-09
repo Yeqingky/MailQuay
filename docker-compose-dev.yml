@@ -34,9 +34,9 @@ services:
     ports:
       - "${MAILQUAY_API_PORT:-127.0.0.1:8080}:8080"
     volumes:
-      - ../data/dev:/data
-      # sudo mkdir -p ../data/dev
-      # sudo chown 101:101 ../data/dev
+      - ./data/dev:/data
+      # sudo mkdir -p ./data/dev
+      # sudo chown 101:101 ./data/dev
     healthcheck:
       test: ["CMD", "/usr/local/bin/mailquay", "healthcheck"]
       interval: 30s
@@ -54,10 +54,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mailquay}
       POSTGRES_DB: ${POSTGRES_DB:-mailquay}
     volumes:
-      - ../pg_data:/var/lib/postgresql
+      - ./pg_data:/var/lib/postgresql
       # sudo docker run --rm postgres:18-alpine id postgres
-      # sudo mkdir -p ../pg_data
-      # sudo chown 70:70 ../pg_data && sudo chmod 750 ../pg_data
+      # sudo mkdir -p ./pg_data
+      # sudo chown 70:70 ./pg_data && sudo chmod 750 ./pg_data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mailquay} -d ${POSTGRES_DB:-mailquay}"]
       interval: 5s

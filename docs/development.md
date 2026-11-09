@@ -380,7 +380,7 @@ docker compose -f docker-compose-dev.yml up -d --build
 
 - 前端和后端: `http://localhost:8080`, 同一容器提供页面和 `/api/v1`, 容器内先执行迁移再启动.
 - 前端在构建镜像时编译; 修改 `frontend` 或后端代码后重新执行带 `--build` 的启动命令.
-- 数据目录使用宿主机绑定挂载: 数据库为 `../pg_data` (uid 70, 权限 750), 运行数据为 `../data/dev` (uid/gid 101). 首次启动前创建并 chown, 否则容器用户无法写入.
+- 数据目录使用宿主机绑定挂载: 数据库为 `./pg_data` (uid 70, 权限 750), 运行数据为 `./data/dev` (uid/gid 101). 首次启动前创建并 chown, 否则容器用户无法写入.
 - 修改前端依赖后重新构建镜像, 不需要在宿主机执行 `pnpm install`.
 - 开发栈参数优先读取 `.env`, compose 用 `${VAR:-默认值}` 提供回退: 数据库账号, 密码和库名默认都是 `mailquay`, 端口默认绑定 `127.0.0.1:8080` (只监听本机); 只有 `MAILQUAY_SECRET_KEY` 必填, 缺失时 Compose 直接报错. `.env.example` 以生产部署为模板, 开发栈专用变量在其中以注释形式列出.
 - 数据库连接串在 compose 里用 `POSTGRES_PASSWORD` 和 `MAILQUAY_DB_NAME` 拼接, 不放进 `.env`. 修改密码后需要在 PostgreSQL 内执行 `ALTER USER mailquay WITH PASSWORD '...'`, 环境变量只影响数据库首次初始化.
