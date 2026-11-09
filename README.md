@@ -35,7 +35,7 @@ MailQuay is not a mail server. It does not run an MTA, does not own a domain, an
 - Unified views deduplicate the same message across folders with a stable provider ID, Message-ID, or content hash fallback.
 - Non-HTTPS access outside loopback and private ranges shows a permanent red warning above the app.
 - Release ships `mailquay` with embedded frontend assets; `mailquay-core` remains an API-only source build.
-- Desktop notifications for new unread mail while MailQuay is open in a background tab, with unread counts in the title and app badge.
+- Desktop notifications for new unread mail, with background Web Push when the tab or browser is closed, plus unread counts in the title and app badge.
 - Centered settings dialog over the mail shell with dedicated navigation, account settings, sync, and appearance.
 - OAuth2 (XOAUTH2) for providers that require it, plus app passwords for generic IMAP or POP3 servers.
 - Server-sent events for new mail, flag changes, task progress, outbox state, and the runtime log console.

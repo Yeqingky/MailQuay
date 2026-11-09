@@ -9,6 +9,8 @@ import { TopBar } from '@/components/layout/TopBar';
 import { useAuthStatus } from '@/hooks/useAuth';
 import { useEventStream } from '@/lib/events/useEventStream';
 import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
+import { usePushSubscription } from '@/hooks/usePushSubscription';
+import { useUiStoreSync } from '@/hooks/useUiStoreSync';
 import { useUnreadBadge } from '@/hooks/useUnreadBadge';
 import {
   LIST_MIN_WIDTH,
@@ -30,6 +32,8 @@ export function AppLayout() {
   const currentView = mailViewFromPathname(pathname);
   const auth = useAuthStatus();
   useEventStream(true);
+  useUiStoreSync();
+  usePushSubscription();
   useBrowserNotifications();
   useUnreadBadge();
   const sidebarWidth = useUiStore((state) => state.sidebarWidth);

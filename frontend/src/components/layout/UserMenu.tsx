@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { logoutRequest } from '@/features/auth/api';
 import { useAuthStatus } from '@/hooks/useAuth';
 import { initials } from '@/lib/format';
+import { removePushSubscription } from '@/lib/push';
 
 export function UserMenu() {
   const { t } = useTranslation();
@@ -30,6 +31,11 @@ export function UserMenu() {
   const openCard = () => {
     window.clearTimeout(closeTimer.current);
     setOpen(true);
+  };
+
+  const signOut = async () => {
+    await removePushSubscription().catch(() => undefined);
+    logout.mutate();
   };
 
   const closeCardSoon = () => {
@@ -112,7 +118,7 @@ export function UserMenu() {
             variant="ghost"
             className="h-7 w-full justify-start gap-1.5 px-2 text-[13px] text-destructive hover:text-destructive"
             size="sm"
-            onClick={() => logout.mutate()}
+            onClick={() => void signOut()}
             disabled={logout.isPending}
           >
             <LogOut aria-hidden="true" />

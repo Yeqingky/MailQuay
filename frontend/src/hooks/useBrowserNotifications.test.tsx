@@ -3,8 +3,14 @@ import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { publishMailEvent } from '@/lib/events/bus';
+import { playNotificationSound } from '@/lib/notificationSound';
 import { useUiStore } from '@/stores/ui';
 import { useBrowserNotifications } from './useBrowserNotifications';
+
+vi.mock('@/lib/notificationSound', () => ({
+  playNotificationSound: vi.fn(),
+  primeNotificationSound: vi.fn(),
+}));
 
 class MockNotification {
   static permission: NotificationPermission = 'granted';
@@ -62,13 +68,22 @@ beforeEach(() => {
     get: () => visibility,
   });
   visibility = 'hidden';
-  useUiStore.setState({ desktopNotifications: true });
+  useUiStore.setState({
+    desktopNotifications: true,
+    notificationSound: false,
+    pushActive: false,
+  });
+  vi.mocked(playNotificationSound).mockClear();
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
-  useUiStore.setState({ desktopNotifications: false });
+  useUiStore.setState({
+    desktopNotifications: false,
+    notificationSound: false,
+    pushActive: false,
+  });
   Reflect.deleteProperty(document, 'visibilityState');
 });
 
@@ -114,5 +129,29 @@ describe('useBrowserNotifications', () => {
     });
 
     expect(screen.getByTestId('location')).toHaveTextContent('/accounts/acc-1/mailboxes/mb-1');
+  });
+
+  it('does not notify while web push is active', () => {
+    useUiStore.setState({ pushActive: true });
+    renderNotifications();
+
+    act(() => {
+      publishMailEvent('message.new', { message: eventMessage('m1') });
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(MockNotification.instances).toHaveLength(0);
+  });
+
+  it('plays a chime when the sound preference is enabled', () => {
+    useUiStore.setState({ notificationSound: true });
+    renderNotifications();
+
+    act(() => {
+      publishMailEvent('message.new', { message: eventMessage('m1') });
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(playNotificationSound).toHaveBeenCalledTimes(1);
   });
 });

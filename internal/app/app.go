@@ -27,6 +27,7 @@ import (
 	"github.com/Yeqingky/MailQuay/internal/message"
 	"github.com/Yeqingky/MailQuay/internal/netpace"
 	"github.com/Yeqingky/MailQuay/internal/platform"
+	"github.com/Yeqingky/MailQuay/internal/push"
 	"github.com/Yeqingky/MailQuay/internal/search"
 	"github.com/Yeqingky/MailQuay/internal/settings"
 	"github.com/Yeqingky/MailQuay/internal/storage"
@@ -49,6 +50,7 @@ type App struct {
 	index     *search.Index
 	hub       *events.Hub
 	settings  *settings.Service
+	push      *push.Service
 	sync      *syncservice.Service
 	compose   *compose.Service
 	sessions  *mailsession.Pool
@@ -108,6 +110,12 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 		"search", snap.Effective.SearchConcurrency, "index_batch", snap.Effective.IndexBatchSize)
 
 	hub := events.NewHub()
+	pushSvc, err := push.New(st, settingsSvc, logger, cfg.DataDir, cfg.VAPIDSubject)
+	if err != nil {
+		index.Close()
+		st.Close()
+		return nil, err
+	}
 	pacer := netpace.New(dialInterval)
 	sessions = mailsession.NewPool(time.Duration(snap.Values.IMAPWorkIdleTimeoutSeconds) * time.Second)
 	sessions.Configure(snap.Values.MaxIMAPConnectionsPerAccount, time.Duration(snap.Values.IMAPWorkIdleTimeoutSeconds)*time.Second)
@@ -170,7 +178,7 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 		st.Close()
 		return nil, err
 	}
-	server := httpapi.NewServer(st, cfg, authSvc, accounts, mailboxes, messages, composeSvc, settingsSvc, syncSvc, index, hub, blobs, logger, cipher, logs)
+	server := httpapi.NewServer(st, cfg, authSvc, accounts, mailboxes, messages, composeSvc, settingsSvc, syncSvc, index, hub, blobs, logger, cipher, logs, pushSvc)
 	handler := httpapi.NewRouter(server, hub, logger)
 	httpServer := &http.Server{
 		Addr:              cfg.ListenAddr,
@@ -181,7 +189,7 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 	}
 	app := &App{
 		cfg: cfg, logger: logger, store: st, blobs: blobs, index: index, hub: hub,
-		settings: settingsSvc, sync: syncSvc, compose: composeSvc, messages: messages,
+		settings: settingsSvc, push: pushSvc, sync: syncSvc, compose: composeSvc, messages: messages,
 		accounts: accounts, sessions: sessions, server: httpServer, indexer: indexer,
 	}
 	return app, nil
@@ -226,11 +234,13 @@ func writeSetupToken(dataDir, token string) (string, error) {
 
 // Run starts background workers and serves HTTP until the context is cancelled.
 func (a *App) Run(ctx context.Context) error {
+	go a.push.Run(ctx, a.hub)
 	a.sync.Start(ctx)
 	indexCtx, cancelIndex := context.WithCancel(ctx)
 	defer cancelIndex()
 	go a.indexer.Run(indexCtx)
 	go a.compose.Run(ctx)
+	go a.push.Run(ctx, a.hub)
 	go a.composeDraftPusher(ctx)
 	go a.cleanupLoop(ctx)
 

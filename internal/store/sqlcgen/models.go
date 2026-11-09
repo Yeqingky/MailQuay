@@ -204,6 +204,17 @@ type PendingOp struct {
 	UpdatedAt     time.Time       `json:"updated_at"`
 }
 
+type PushSubscription struct {
+	ID        uuid.UUID `json:"id"`
+	Endpoint  string    `json:"endpoint"`
+	P256dh    string    `json:"p256dh"`
+	Auth      string    `json:"auth"`
+	Sound     bool      `json:"sound"`
+	UserAgent string    `json:"user_agent"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type SearchJob struct {
 	ID            uuid.UUID  `json:"id"`
 	MessageID     uuid.UUID  `json:"message_id"`

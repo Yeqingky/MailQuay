@@ -698,7 +698,9 @@ const en = {
       notificationsHint: 'System alerts for new mail. These settings apply to this browser.',
       desktopNotifications: 'Desktop notifications',
       desktopNotificationsHint:
-        'Show a system notification when new mail arrives while this tab is in the background.',
+        'Show system notifications for new mail. When supported, notifications continue after the tab or browser is closed.',
+      notificationSound: 'Notification sound',
+      notificationSoundHint: 'Play a short chime with new-mail notifications.',
       notificationsBlocked:
         'Notifications are blocked. Allow them for this site in the browser settings.',
       notificationsUnsupported: 'This browser does not support desktop notifications.',

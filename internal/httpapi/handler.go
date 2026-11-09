@@ -22,6 +22,7 @@ import (
 	"github.com/Yeqingky/MailQuay/internal/mailbox"
 	"github.com/Yeqingky/MailQuay/internal/message"
 	"github.com/Yeqingky/MailQuay/internal/platform"
+	"github.com/Yeqingky/MailQuay/internal/push"
 	"github.com/Yeqingky/MailQuay/internal/search"
 	"github.com/Yeqingky/MailQuay/internal/settings"
 	"github.com/Yeqingky/MailQuay/internal/storage"
@@ -49,17 +50,19 @@ type Server struct {
 	logs           *platform.LogBuffer
 	oauth          *OAuth
 	cipher         *crypto.Cipher
+	push           *push.Service
 }
 
 // NewServer builds the HTTP server.
 func NewServer(st *store.Store, cfg *config.Config, authSvc *auth.Service, accounts *account.Service,
 	mailboxes *mailbox.Service, messages *message.Service, composeSvc *compose.Service,
 	settingsSvc *settings.Service, syncSvc *syncservice.Service, index *search.Index, hub *events.Hub,
-	blobs *storage.Store, logger *slog.Logger, cipher *crypto.Cipher, logs *platform.LogBuffer) *Server {
+	blobs *storage.Store, logger *slog.Logger, cipher *crypto.Cipher, logs *platform.LogBuffer,
+	pushSvc *push.Service) *Server {
 	return &Server{
 		store: st, cfg: cfg, auth: authSvc, accounts: accounts, mailboxes: mailboxes,
 		messages: messages, compose: composeSvc, settings: settingsSvc, avatarSettings: settingsSvc, sync: syncSvc,
-		index: index, hub: hub, blobs: blobs, logger: logger, cipher: cipher, logs: logs,
+		index: index, hub: hub, blobs: blobs, logger: logger, cipher: cipher, logs: logs, push: pushSvc,
 		oauth: NewOAuth(cfg, settingsSvc, st, accounts, cipher),
 	}
 }

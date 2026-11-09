@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router';
 import { readEventMessage } from '@/features/message-list/eventPayload';
 import type { MessageSummary } from '@/features/message-list/api';
 import { subscribeMailEvent, type MessageEventPayload } from '@/lib/events/bus';
+import { playNotificationSound } from '@/lib/notificationSound';
 import { useUiStore } from '@/stores/ui';
 
 const COALESCE_MS = 1_000;
@@ -19,13 +20,15 @@ export function useBrowserNotifications(): void {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const enabled = useUiStore((state) => state.desktopNotifications);
+  const notificationSound = useUiStore((state) => state.notificationSound);
+  const pushActive = useUiStore((state) => state.pushActive);
   const pending = useRef<MessageSummary[]>([]);
   const seen = useRef<Set<string>>(new Set());
   const timer = useRef<number | undefined>(undefined);
 
   const flush = useCallback(() => {
     timer.current = undefined;
-    if (!enabled) {
+    if (!enabled || pushActive) {
       pending.current = [];
       return;
     }
@@ -62,13 +65,14 @@ export function useBrowserNotifications(): void {
           `/accounts/${encodeURIComponent(latest.accountId)}/mailboxes/${encodeURIComponent(latest.mailboxId)}`,
         );
       };
+      if (notificationSound) playNotificationSound();
     } catch {
       // Some mobile browsers expose Notification but reject the constructor.
     }
-  }, [enabled, navigate, t]);
+  }, [enabled, navigate, notificationSound, pushActive, t]);
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || pushActive) {
       pending.current = [];
       if (timer.current !== undefined) {
         window.clearTimeout(timer.current);
@@ -110,5 +114,5 @@ export function useBrowserNotifications(): void {
         timer.current = undefined;
       }
     };
-  }, [enabled, flush]);
+  }, [enabled, flush, pushActive]);
 }

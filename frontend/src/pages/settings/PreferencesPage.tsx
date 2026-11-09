@@ -22,6 +22,7 @@ import {
   SettingsSection,
 } from '@/features/settings/SettingsSection';
 import { applyLanguage, SUPPORTED_LANGUAGES } from '@/lib/i18n';
+import { primeNotificationSound } from '@/lib/notificationSound';
 import { applyThemeClass, useUiStore, type ThemePreference } from '@/stores/ui';
 import type { SupportedLanguage } from '@/lib/i18n';
 
@@ -47,6 +48,8 @@ export function PreferencesSettingsPage() {
   const setTheme = useUiStore((state) => state.setTheme);
   const desktopNotifications = useUiStore((state) => state.desktopNotifications);
   const setDesktopNotifications = useUiStore((state) => state.setDesktopNotifications);
+  const notificationSound = useUiStore((state) => state.notificationSound);
+  const setNotificationSound = useUiStore((state) => state.setNotificationSound);
   const notificationsSupported = typeof window !== 'undefined' && 'Notification' in window;
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
     () => (notificationsSupported ? Notification.permission : 'denied'),
@@ -291,6 +294,24 @@ export function PreferencesSettingsPage() {
               onCheckedChange={(enabled) => void toggleDesktopNotifications(enabled)}
               disabled={!notificationsSupported || notificationPermission === 'denied'}
               aria-label={t('settings.preferences.desktopNotifications')}
+            />
+          }
+        />
+        <SettingsDivider />
+        <SettingsRow
+          title={t('settings.preferences.notificationSound')}
+          description={t('settings.preferences.notificationSoundHint')}
+          htmlFor="settings-notification-sound"
+          control={
+            <Switch
+              id="settings-notification-sound"
+              checked={notificationSound}
+              onCheckedChange={(enabled) => {
+                if (enabled) primeNotificationSound();
+                setNotificationSound(enabled);
+              }}
+              disabled={!desktopNotifications}
+              aria-label={t('settings.preferences.notificationSound')}
             />
           }
         />

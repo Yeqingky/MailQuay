@@ -19,7 +19,9 @@
 - 新增 `gitea-mirror` 工作流, 每次 push 和手动触发时通过 `GITEA_ACCESS_TOKEN` 将全部分支和标签镜像到 `https://git.ovh.im/yeqing/MailQuay`.
 - 新增 Playwright 浏览器 e2e: `scripts/e2e-server.sh` 重建测试库并启动 full 构建, 覆盖 owner 初始化, 登录, 导航, 任务中心, 搜索, 设置和主题; 新增 push/PR `e2e` 工作流.
 - GitHub Actions 升级到 Node 24 版本: `checkout@v5`, `setup-go@v6`, `setup-node@v5`, `upload-artifact@v6`, `download-artifact@v7`, Docker actions v4/v7.
-- 新增浏览器桌面通知: 设置页可按浏览器开启, 页面不可见时对未读新邮件发送系统通知, 点击聚焦并打开对应文件夹; 标题和 App Badge 显示未读总数. 仅在页面打开时生效.
+- 新增浏览器桌面通知: 设置页可按浏览器开启, 页面不可见时对未读新邮件发送系统通知, 点击聚焦并打开对应文件夹; 标题和 App Badge 显示未读总数.
+- 新增 Web Push 后台通知: Service Worker, VAPID 密钥, `push_subscriptions` 表和订阅 API; 关闭标签页或浏览器后仍可收到未读新邮件提醒.
+- 通知设置新增提示音开关; 页面回退使用 Web Audio, Web Push 通过订阅的 `sound` 字段控制 `silent`.
 
 ### 修复
 

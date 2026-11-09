@@ -22,6 +22,7 @@ tags:
   - name: logs
   - name: settings
   - name: events
+  - name: push
   - name: oauth
 paths:
   /auth/me:
@@ -1074,6 +1075,42 @@ paths:
             text/event-stream:
               schema: { type: string }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /push/vapid:
+    get:
+      operationId: getPushVapidKey
+      tags: [push]
+      responses:
+        '200':
+          description: Public VAPID key for Web Push subscriptions.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PushVapidKey' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /push/subscriptions:
+    post:
+      operationId: subscribePush
+      tags: [push]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PushSubscriptionRequest' }
+      responses:
+        '204': { description: Subscription saved. }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      operationId: unsubscribePush
+      tags: [push]
+      parameters:
+        - name: endpoint
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: Subscription removed. }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /oauth/{provider}/start:
     parameters:
       - $ref: '#/components/parameters/OAuthProvider'
@@ -1213,6 +1250,24 @@ components:
         scheme: { type: string }
         host: { type: string }
       required: [insecureTransport, scheme, host]
+    PushVapidKey:
+      type: object
+      properties:
+        publicKey: { type: string }
+      required: [publicKey]
+    PushSubscriptionKeys:
+      type: object
+      properties:
+        p256dh: { type: string }
+        auth: { type: string }
+      required: [p256dh, auth]
+    PushSubscriptionRequest:
+      type: object
+      properties:
+        endpoint: { type: string }
+        keys: { $ref: '#/components/schemas/PushSubscriptionKeys' }
+        sound: { type: boolean, default: false }
+      required: [endpoint, keys]
     User:
       type: object
       properties:

@@ -912,6 +912,24 @@ type OutboxItem struct {
 // OutboxItemStatus defines model for OutboxItem.Status.
 type OutboxItemStatus string
 
+// PushSubscriptionKeys defines model for PushSubscriptionKeys.
+type PushSubscriptionKeys struct {
+	Auth   string `json:"auth"`
+	P256dh string `json:"p256dh"`
+}
+
+// PushSubscriptionRequest defines model for PushSubscriptionRequest.
+type PushSubscriptionRequest struct {
+	Endpoint string               `json:"endpoint"`
+	Keys     PushSubscriptionKeys `json:"keys"`
+	Sound    *bool                `json:"sound,omitempty"`
+}
+
+// PushVapidKey defines model for PushVapidKey.
+type PushVapidKey struct {
+	PublicKey string `json:"publicKey"`
+}
+
 // RescheduleRequest defines model for RescheduleRequest.
 type RescheduleRequest struct {
 	ScheduledAt time.Time `json:"scheduledAt"`
@@ -1239,6 +1257,11 @@ type OauthStartParams struct {
 	AccountId *openapi_types.UUID `form:"accountId,omitempty" json:"accountId,omitempty"`
 }
 
+// UnsubscribePushParams defines parameters for UnsubscribePush.
+type UnsubscribePushParams struct {
+	Endpoint string `form:"endpoint" json:"endpoint"`
+}
+
 // SearchMessagesParams defines parameters for SearchMessages.
 type SearchMessagesParams struct {
 	Q             *string                   `form:"q,omitempty" json:"q,omitempty"`
@@ -1314,6 +1337,9 @@ type MoveMessageJSONRequestBody = MoveMessageRequest
 
 // RescheduleOutboxJSONRequestBody defines body for RescheduleOutbox for application/json ContentType.
 type RescheduleOutboxJSONRequestBody = RescheduleRequest
+
+// SubscribePushJSONRequestBody defines body for SubscribePush for application/json ContentType.
+type SubscribePushJSONRequestBody = PushSubscriptionRequest
 
 // UpdateSettingsJSONRequestBody defines body for UpdateSettings for application/json ContentType.
 type UpdateSettingsJSONRequestBody = SettingsUpdate
@@ -1485,6 +1511,15 @@ type ServerInterface interface {
 
 	// (POST /outbox/{id}/retry)
 	RetryOutbox(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (DELETE /push/subscriptions)
+	UnsubscribePush(w http.ResponseWriter, r *http.Request, params UnsubscribePushParams)
+
+	// (POST /push/subscriptions)
+	SubscribePush(w http.ResponseWriter, r *http.Request)
+
+	// (GET /push/vapid)
+	GetPushVapidKey(w http.ResponseWriter, r *http.Request)
 
 	// (GET /search)
 	SearchMessages(w http.ResponseWriter, r *http.Request, params SearchMessagesParams)
@@ -1796,6 +1831,21 @@ func (_ Unimplemented) CancelOutbox(w http.ResponseWriter, r *http.Request, id o
 
 // (POST /outbox/{id}/retry)
 func (_ Unimplemented) RetryOutbox(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /push/subscriptions)
+func (_ Unimplemented) UnsubscribePush(w http.ResponseWriter, r *http.Request, params UnsubscribePushParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /push/subscriptions)
+func (_ Unimplemented) SubscribePush(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /push/vapid)
+func (_ Unimplemented) GetPushVapidKey(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3229,6 +3279,68 @@ func (siw *ServerInterfaceWrapper) RetryOutbox(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// UnsubscribePush operation middleware
+func (siw *ServerInterfaceWrapper) UnsubscribePush(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UnsubscribePushParams
+
+	// ------------- Required query parameter "endpoint" -------------
+
+	if paramValue := r.URL.Query().Get("endpoint"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "endpoint"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "endpoint", r.URL.Query(), &params.Endpoint)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "endpoint", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnsubscribePush(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SubscribePush operation middleware
+func (siw *ServerInterfaceWrapper) SubscribePush(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SubscribePush(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetPushVapidKey operation middleware
+func (siw *ServerInterfaceWrapper) GetPushVapidKey(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPushVapidKey(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // SearchMessages operation middleware
 func (siw *ServerInterfaceWrapper) SearchMessages(w http.ResponseWriter, r *http.Request) {
 
@@ -3809,6 +3921,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/outbox/{id}/retry", wrapper.RetryOutbox)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/push/subscriptions", wrapper.UnsubscribePush)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/push/subscriptions", wrapper.SubscribePush)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/push/vapid", wrapper.GetPushVapidKey)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/search", wrapper.SearchMessages)

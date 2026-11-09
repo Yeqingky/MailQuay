@@ -28,19 +28,21 @@ type Config struct {
 	CORSOrigins    []string
 	InsecureAllow  []string
 	SetupToken     string
+	VAPIDSubject   string
 }
 
 // Load reads configuration from the environment and validates it.
 func Load() (*Config, error) {
 	cfg := &Config{
-		ListenAddr:  env("MAILQUAY_LISTEN_ADDR", ":8080"),
-		PublicURL:   strings.TrimRight(env("MAILQUAY_PUBLIC_URL", ""), "/"),
-		DatabaseURL: env("MAILQUAY_DATABASE_URL", ""),
-		DataDir:     env("MAILQUAY_DATA_DIR", "./data"),
-		SecretKey:   env("MAILQUAY_SECRET_KEY", ""),
-		LogLevel:    env("MAILQUAY_LOG_LEVEL", "info"),
-		LogFormat:   env("MAILQUAY_LOG_FORMAT", "text"),
-		SetupToken:  env("MAILQUAY_SETUP_TOKEN", ""),
+		ListenAddr:   env("MAILQUAY_LISTEN_ADDR", ":8080"),
+		PublicURL:    strings.TrimRight(env("MAILQUAY_PUBLIC_URL", ""), "/"),
+		DatabaseURL:  env("MAILQUAY_DATABASE_URL", ""),
+		DataDir:      env("MAILQUAY_DATA_DIR", "./data"),
+		SecretKey:    env("MAILQUAY_SECRET_KEY", ""),
+		LogLevel:     env("MAILQUAY_LOG_LEVEL", "info"),
+		LogFormat:    env("MAILQUAY_LOG_FORMAT", "text"),
+		SetupToken:   env("MAILQUAY_SETUP_TOKEN", ""),
+		VAPIDSubject: env("MAILQUAY_VAPID_SUBJECT", "mailto:admin@localhost"),
 	}
 	cfg.SearchPath = env("MAILQUAY_SEARCH_PATH", cfg.DataDir+"/search")
 	if cfg.DatabaseURL == "" {
@@ -51,6 +53,9 @@ func Load() (*Config, error) {
 	}
 	if cfg.SetupToken != "" && len(cfg.SetupToken) < 16 {
 		return nil, fmt.Errorf("MAILQUAY_SETUP_TOKEN must be at least 16 characters")
+	}
+	if !strings.HasPrefix(cfg.VAPIDSubject, "mailto:") && !strings.HasPrefix(cfg.VAPIDSubject, "https://") {
+		return nil, fmt.Errorf("MAILQUAY_VAPID_SUBJECT must start with mailto: or https://")
 	}
 	if cfg.PublicURL != "" {
 		u, err := url.Parse(cfg.PublicURL)

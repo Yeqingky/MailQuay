@@ -118,6 +118,7 @@ MailQuay/
 | `internal/store` | 仓储接口与 pgx/sqlc 实现, 事务, 迁移入口 | `platform` |
 | `internal/search` | Bleve 映射, 索引任务, 查询解析, 高亮, 重建 | `store`, `mime`, `storage`, `platform` |
 | `internal/events` | 进程内发布订阅, SSE 序列化, 环形回放 | `platform` |
+| `internal/push` | Web Push 订阅, VAPID 密钥, 通知投递和过期清理 | `store`, `settings`, `events`, `platform` |
 | `internal/webassets` | `full` 构建嵌入前端静态资源; `core` 构建返回空实现 | 无 |
 | `internal/crypto` | 主密钥解析, 字段加解密 | 无 |
 | `internal/platform` | `slog`, 时钟接口, UUIDv7, 退避, cgroup v1/v2 CPU 与内存检测 | 无 |
@@ -157,7 +158,9 @@ frontend/
 ├── .editorconfig
 ├── .gitignore
 ├── public/
-│   └── config.js                   # 运行时配置占位
+│   ├── config.js                   # 运行时配置占位
+│   ├── sw.js                      # Web Push Service Worker
+│   └── theme-init.js               # 首屏主题
 ├── src/
 │   ├── main.tsx                    # 挂载 Provider 和 RouterProvider
 │   ├── app/
@@ -204,11 +207,15 @@ frontend/
 │   │   │   └── errors.ts
 │   │   ├── events/useEventStream.ts
 │   │   ├── documentTitle.ts        # 标题未读数与 App Badge
+│   │   ├── notificationSound.ts    # 本地通知提示音
+│   │   ├── push.ts                 # Web Push 订阅
 │   │   ├── mail/                   # HTML 清洗, 引用折叠, 地址格式化
 │   │   ├── format.ts
 │   │   └── utils.ts
 │   ├── hooks/
-│   │   ├── useBrowserNotifications.ts  # 桌面通知
+│   │   ├── useBrowserNotifications.ts  # 桌面通知回退
+│   │   ├── usePushSubscription.ts  # Web Push 订阅同步
+│   │   ├── useUiStoreSync.ts       # 跨标签页 UI 状态同步
 │   │   └── useUnreadBadge.ts       # 未读数标题与 App Badge
 │   ├── stores/
 │   │   ├── ui.ts                   # 侧边栏, 阅读器, 主题

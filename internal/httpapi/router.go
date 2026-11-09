@@ -146,7 +146,7 @@ func (s *Server) securityHeaders(next http.Handler) http.Handler {
 		// Remote mail images are stripped by the frontend sanitizer until the
 		// user allows the sender, so img-src must permit those opt-in requests.
 		// Sandboxed mail srcdoc uses about:, which must be allowed by frame-src.
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http: https:; font-src 'self' data:; connect-src 'self'; frame-src 'self' data: blob: about:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http: https:; font-src 'self' data:; connect-src 'self'; frame-src 'self' data: blob: about:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'")
 		if auth.RequestScheme(r, s.cfg.TrustedProxies) == "https" {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 		}

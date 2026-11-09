@@ -28,6 +28,7 @@
 - 非 HTTPS 且不命中豁免域名/CIDR 时, 前端顶部显示全宽红色提醒条, 不可关闭, 不可隐藏.
 - 默认豁免 loopback 和私网 CIDR; `MAILQUAY_INSECURE_ALLOW` 可追加域名或 CIDR, 只有命中豁免才不渲染提醒条.
 - 凭据和 OAuth token 必须加密存储, 不得写入日志, 错误响应或前端状态.
+- VAPID 私钥只保存在数据目录 `vapid.json` (`0600`), 不写入数据库, 日志或前端.
 - 只有邮箱账号是 ID 化实体; 用户名, 密码, OAuth token, IMAP/POP3/SMTP 地址直接存在账号上, 不建独立凭据或连接表.
 - 收信和发信分别鉴权: 账号保存收信用户名和密码, SMTP 可另外保存用户名和密码; SMTP 凭据留空时复用收信凭据.
 - IMAP 建连固定 TLS 1.2 及以上; 只有 `139.com` 和 `10086.cn` 的 IMAP 主机额外提供静态 RSA 套件, 因为其网关会拒绝未携带此类套件的 ClientHello.
@@ -103,6 +104,7 @@
 | `internal/store` | 仓储接口, pgx/sqlc 实现, 事务 |
 | `internal/search` | Bleve 映射, 索引任务, 查询, 重建 |
 | `internal/events` | 事件总线与 SSE |
+| `internal/push` | Web Push 订阅, VAPID 密钥与通知投递 |
 | `internal/settings` | 全局设置, 默认值与并发计算 |
 | `internal/mime` | 解析, 正文提取, HTML 清洗 |
 | `frontend/src/features` | 按业务资源组织的前端功能 |
@@ -222,7 +224,8 @@ pnpm generate:api
 - UI 过渡统一使用 `motion` (`motion/react`): 根节点 `MotionConfig` 固定 `reducedMotion="user"`, 通知堆叠和浮层收放使用 layout 与 `AnimatePresence`, 不新增同类 CSS keyframes; 宽度等非 transform 动画在 `prefers-reduced-motion` 下直接跳到目标值.
 - 不引入第二套组件库, 新组件优先放到 `components/ui` 或对应 feature.
 - pnpm 12 的依赖覆盖写入 `frontend/pnpm-workspace.yaml` 的 `overrides`, 不写入 `package.json` 的 `pnpm` 字段.
-- 桌面通知使用 Notification API, 默认关闭, 仅在用户打开开关并授权后发送; 只在页面不可见时提醒未读新邮件, 点击聚焦窗口并打开对应账号文件夹, 通知内容不写入后端. 通知只在页面打开时生效, 不实现 Web Push 或 Service Worker 后台推送.
+- 桌面通知默认关闭, 打开开关并授权后同时启用本地 Notification 和 Web Push; 新未读邮件在页面不可见时由 Service Worker 通知, 页面没有 Push 订阅时回退到本地 Notification; 点击聚焦并打开对应账号文件夹, 通知内容不写入后端. 订阅保存在 `push_subscriptions` 表, VAPID 私钥保存在数据目录 `vapid.json` (权限 0600), 联系地址通过 `MAILQUAY_VAPID_SUBJECT` 配置.
+- 提示音按浏览器开关; 本地回退使用 Web Audio, Web Push 的 `silent` 由订阅的 `sound` 字段控制.
 - 页面标题的未读数前缀和可选 App Badge 由 `lib/documentTitle` 统一合成, 页面标题仍通过 `useDocumentTitle` 设置.
 
 ## 7. 测试
@@ -239,7 +242,7 @@ pnpm generate:api
 - 资源检测和并发测试覆盖 cgroup v1/v2, Compose 限制, 回退值, 同步/拉取设置值和索引推荐值.
 - IMAP, POP3 和 SMTP 使用本地模拟服务, 测试不依赖真实邮箱账号.
 - 异步测试使用条件等待, 不使用固定 `sleep`.
-- 浏览器 e2e 使用 Playwright 和真实 full 构建, 由 `scripts/e2e-server.sh` 重建测试库并启动服务, 覆盖 owner 初始化, 登录, 导航, 任务中心, 搜索, 设置, 桌面通知和主题; 不依赖外部邮箱服务.
+- 浏览器 e2e 使用 Playwright 和真实 full 构建, 由 `scripts/e2e-server.sh` 重建测试库并启动服务, 覆盖 owner 初始化, 登录, 导航, 任务中心, 搜索, 设置, 桌面通知和提示音; 不依赖外部邮箱服务.
 - 不为了通过测试而放宽断言或删除既有契约测试.
 
 ## 8. 文档

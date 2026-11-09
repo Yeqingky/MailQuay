@@ -544,6 +544,15 @@ HTTP 层注意:
 - 反向代理关闭 `proxy_buffering`, 设置 `proxy_read_timeout` 大于心跳间隔.
 - HTTP/2 下限制每连接并发流, 避免大量标签页耗尽连接.
 
+### 5.1 Web Push
+
+- 桌面通知使用 Notification API 与 Web Push. 用户打开开关并授权后, 前端注册 `/sw.js`, 通过 `GET /push/vapid` 获取公钥并调用 `PushManager.subscribe`.
+- 订阅通过 `POST /push/subscriptions` 存入 PostgreSQL `push_subscriptions`; 每条订阅保存 `sound` 标志, 退出登录时删除当前浏览器的订阅.
+- VAPID 私钥和公钥保存在数据目录 `vapid.json` (权限 0600), `MAILQUAY_VAPID_SUBJECT` 提供 VAPID 联系地址.
+- `internal/push` 订阅进程内事件总线, 对未读 `message.new` 做 1 秒合并, 通过 Web Push 发送 `title`, `body`, `url` 和 `silent`; 推送服务返回 404 或 410 时删除过期订阅.
+- Service Worker 收到推送后检查窗口客户端: 有聚焦窗口时跳过, 否则显示系统通知; 点击通知打开对应账号文件夹.
+- 页面没有有效 Push 订阅时, 前端回退到页面内 Notification API; Web Push 活跃时不再重复显示本地通知.
+
 ## 6. 搜索
 
 搜索使用 Bleve v2 内嵌索引, 索引存放在数据卷, 不引入外部搜索服务. PostgreSQL 保存元数据和搜索任务, Bleve 保存派生索引. 索引丢失可以重建, 不进入核心备份.

@@ -875,6 +875,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/push/vapid": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getPushVapidKey"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/push/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["subscribePush"];
+        delete: operations["unsubscribePush"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/oauth/{provider}/start": {
         parameters: {
             query?: never;
@@ -929,6 +961,19 @@ export interface components {
             insecureTransport: boolean;
             scheme: string;
             host: string;
+        };
+        PushVapidKey: {
+            publicKey: string;
+        };
+        PushSubscriptionKeys: {
+            p256dh: string;
+            auth: string;
+        };
+        PushSubscriptionRequest: {
+            endpoint: string;
+            keys: components["schemas"]["PushSubscriptionKeys"];
+            /** @default false */
+            sound: boolean;
         };
         User: {
             /** Format: uuid */
@@ -3172,6 +3217,73 @@ export interface operations {
                     "text/event-stream": string;
                 };
             };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getPushVapidKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Public VAPID key for Web Push subscriptions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushVapidKey"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    subscribePush: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushSubscriptionRequest"];
+            };
+        };
+        responses: {
+            /** @description Subscription saved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    unsubscribePush: {
+        parameters: {
+            query: {
+                endpoint: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Subscription removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
         };
     };
