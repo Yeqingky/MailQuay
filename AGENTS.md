@@ -221,6 +221,7 @@ pnpm generate:api
 - SSE 连续失败 3 次后停止重连并显示连接失败, 不实现 HTTP 轮询兜底; 左下角按已连接(绿色), 重试中(黄色), 连接失败(红色) 显示连接状态.
 - UI 过渡统一使用 `motion` (`motion/react`): 根节点 `MotionConfig` 固定 `reducedMotion="user"`, 通知堆叠和浮层收放使用 layout 与 `AnimatePresence`, 不新增同类 CSS keyframes; 宽度等非 transform 动画在 `prefers-reduced-motion` 下直接跳到目标值.
 - 不引入第二套组件库, 新组件优先放到 `components/ui` 或对应 feature.
+- pnpm 12 的依赖覆盖写入 `frontend/pnpm-workspace.yaml` 的 `overrides`, 不写入 `package.json` 的 `pnpm` 字段.
 
 ## 7. 测试
 
@@ -259,6 +260,7 @@ pnpm generate:api
 - `gitea-mirror.yml` 在每次 push 和手动触发时使用 `GITEA_ACCESS_TOKEN`, 将全部分支和标签镜像到 `https://git.ovh.im/yeqing/MailQuay`.
 - 后端二进制覆盖 linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64, windows/arm64; Docker 只做 linux/amd64 和 linux/arm64.
 - 代码和产物文件名使用 `darwin`, 用户界面和发布说明写 `macOS`; 不手工创建 Release 绕过工作流.
+- 工作流 action 使用 Node 24 版本: `checkout@v5`, `setup-go@v6`, `setup-node@v5`, `upload-artifact@v6`, `download-artifact@v7`, Docker actions v4/v7.
 - 工作流的每个 job 必须设置 `timeout-minutes`; 联网步骤必须使用命令级 `timeout` 并最多重试 3 次; 平台构建矩阵使用 `fail-fast: false`.
 - Docker 镜像统一发布到 `ghcr.io/yeqingky/mailquay`: 使用 `vX.Y.Z`, `latest` 和 7 位短提交哈希标签.
 - 镜像内运行用户固定为 `mailquay` (`uid/gid 101`), 由 `addgroup -g 101` 和 `adduser -u 101` 显式指定, 不依赖 Alpine 的自动分配 (其 `users` 占用了 gid 100); 宿主绑定挂载的数据目录必须 `chown 101:101`.

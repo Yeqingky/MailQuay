@@ -145,6 +145,7 @@ frontend/
 ├── LICENSE
 ├── package.json
 ├── pnpm-lock.yaml
+├── pnpm-workspace.yaml           # pnpm overrides
 ├── vite.config.ts
 ├── playwright.config.ts
 ├── tsconfig.json

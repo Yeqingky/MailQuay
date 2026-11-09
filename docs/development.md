@@ -181,6 +181,8 @@ VITE_API_BASE_URL=http://127.0.0.1:8080/api/v1
 | `pnpm e2e` | Playwright 浏览器端到端测试 |
 | `pnpm generate:api` | 从 `../api/openapi.yaml` 生成类型 |
 
+依赖覆盖写在 `frontend/pnpm-workspace.yaml` 的 `overrides`; pnpm 12 不再读取 `package.json` 的 `pnpm` 字段.
+
 ## 7. API 合同
 
 1. 先修改 `api/openapi.yaml`.
@@ -408,6 +410,7 @@ docker compose -f docker-compose-dev.yml up -d --build
 - 镜像标签: `vX.Y.Z`, `latest` 和 7 位短提交哈希.
 - Docker 镜像使用 BuildKit 多架构构建; Dockerfile 的 Go 编译阶段按 `TARGETOS`/`TARGETARCH` 交叉编译, 只在运行阶段使用目标架构基础镜像.
 - `gitea-mirror.yml` 在每次 push 和手动触发时, 使用机密 `GITEA_ACCESS_TOKEN` 通过 HTTPS 将全部分支和标签镜像到 `https://git.ovh.im/yeqing/MailQuay`.
+- 所有 actions 使用 Node 24 版本: `checkout@v5`, `setup-go@v6`, `setup-node@v5`, `upload-artifact@v6`, `download-artifact@v7`, Docker actions v4/v7.
 - 所有工作流的 job 必须设置 `timeout-minutes`: e2e 30, 发布前端 20, 二进制矩阵 30, 镜像 45, 发布上传 10, Gitea 镜像 15.
 - 联网步骤必须加命令级 `timeout`: `corepack pnpm install` 900 秒, `corepack pnpm build` 600 秒, Chromium 安装 600 秒, e2e 1200 秒, Gitea 推送 300 秒.
 - 平台矩阵使用 `fail-fast: false`, 单个平台失败不取消其他平台产物.

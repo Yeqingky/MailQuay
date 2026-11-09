@@ -14,15 +14,17 @@
 - 批量同步不再逐封推送 `message.new`: 首次同步, UIDVALIDITY 重置或一次新增超过 50 封时改为每秒最多一条 `mailbox.updated` 进度事件, 同步结束, 失败或取消时补发最终事件.
 - `message.new` 附带列表行所需的轻量摘要 (不含正文和附件), IDLE 与增量新邮件可直接插入列表.
 - 前端不再按事件逐封请求 `GET /messages/{id}`: 缺摘要时合并为一次列表刷新, SSE 引发的缓存失效按 1-1.5 秒窗口合并, 页面重新可见时校准计数和任务.
-- 删除 push/PR CI 工作流, 只保留标签触发的发布工作流和 push 触发的 Gitea 镜像工作流.
+- 发布工作流只在标签触发; push/PR 只运行浏览器 e2e, 不再运行后端和前端构建 CI.
 - Release 只发布含前端的 `mailquay` 二进制包和 Docker 镜像, 不再发布 `mailquay-core` 与 `-core` 镜像.
 - 新增 `gitea-mirror` 工作流, 每次 push 和手动触发时通过 `GITEA_ACCESS_TOKEN` 将全部分支和标签镜像到 `https://git.ovh.im/yeqing/MailQuay`.
 - 新增 Playwright 浏览器 e2e: `scripts/e2e-server.sh` 重建测试库并启动 full 构建, 覆盖 owner 初始化, 登录, 导航, 任务中心, 搜索, 设置和主题; 新增 push/PR `e2e` 工作流.
+- GitHub Actions 升级到 Node 24 版本: `checkout@v5`, `setup-go@v6`, `setup-node@v5`, `upload-artifact@v6`, `download-artifact@v7`, Docker actions v4/v7.
 
 ### 修复
 
 - 首次同步等批量拉取期间, 浏览器按邮件数量发起详情请求导致请求风暴和连接失败.
 - 开发栈 Compose 的数据目录挂载改为仓库内的 `./data/dev` 和 `./pg_data`, 与生产栈和文档一致.
+- 通过 `frontend/pnpm-workspace.yaml` 将 ESLint 依赖的 minimatch 10.x 覆盖为 11.0.1, 修复 GHSA-g3hv-75wg-m249 安全告警.
 
 ## v0.1.1 - 2026-10-28
 

@@ -8,7 +8,7 @@
 FROM --platform=$BUILDPLATFORM node:24-bookworm-slim AS web
 WORKDIR /app
 RUN corepack enable
-COPY --from=frontend package.json pnpm-lock.yaml ./
+COPY --from=frontend package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY --from=frontend . .
 RUN pnpm build
