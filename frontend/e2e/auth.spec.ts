@@ -3,7 +3,7 @@ import { OWNER_PASSWORD, OWNER_USERNAME } from './constants';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-test('signs out and signs back in', async ({ page }) => {
+test('signs out, signs back in, and shows the notification prompt', async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(Notification, 'permission', {
       configurable: true,
